@@ -17,6 +17,9 @@ app.use(cors({
 app.use(express.json());
 
 // ─── Routes ──────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.send('QuickTools.ai Backend API is Running! 🚀');
+});
 app.use('/api/blogs', blogRoutes);
 app.use('/api/cron', cronRoutes);
 
