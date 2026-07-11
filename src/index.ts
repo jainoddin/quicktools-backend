@@ -5,6 +5,9 @@ import { connectDB } from './config/db';
 import blogRoutes from './routes/blog.routes';
 import cronRoutes from './routes/cron.routes';
 import toolsRoutes from './routes/tools.routes';
+import authRoutes from './routes/auth.routes';
+import cookieParser from 'cookie-parser';
+import passport from 'passport';
 import { startCronJobs } from './cron/blogScheduler';
 
 const app = express();
@@ -22,6 +25,8 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(cookieParser());
+app.use(passport.initialize());
 
 // ─── Routes ──────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -30,6 +35,7 @@ app.get('/', (req, res) => {
 app.use('/api/blogs', blogRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/tools', toolsRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
