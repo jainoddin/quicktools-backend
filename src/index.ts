@@ -4,6 +4,7 @@ import cors from 'cors';
 import { connectDB } from './config/db';
 import blogRoutes from './routes/blog.routes';
 import cronRoutes from './routes/cron.routes';
+import toolsRoutes from './routes/tools.routes';
 import { startCronJobs } from './cron/blogScheduler';
 
 const app = express();
@@ -28,6 +29,7 @@ app.get('/', (req, res) => {
 });
 app.use('/api/blogs', blogRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/tools', toolsRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

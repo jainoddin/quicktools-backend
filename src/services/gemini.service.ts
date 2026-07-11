@@ -182,3 +182,36 @@ Rules:
     metaDescription: generated.metaDescription || generated.description,
   };
 }
+
+export async function generateToolText(params: {
+  prompt: string;
+  contentType: string;
+  tone: string;
+  language: string;
+  creativity: number;
+}): Promise<string> {
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: params.creativity / 10, // Maps 1-10 to 0.1-1.0
+    }
+  });
+
+  const systemPrompt = `You are an expert AI Writer and Content Creator.
+Your task is to write high-quality, engaging content based on the user's requirements.
+
+Format Requirements:
+- Content Type: ${params.contentType}
+- Tone of Voice: ${params.tone}
+- Language: ${params.language}
+- Output format: Clean Markdown (use headings, bullet points, etc. where appropriate).
+
+Do NOT include any extra conversational text (e.g., "Here is your blog post:"). Output ONLY the requested content.`;
+
+  const finalPrompt = `${systemPrompt}\n\nUser Request/Topic:\n${params.prompt}`;
+
+  console.log(`🤖 Generating ${params.contentType} for prompt: "${params.prompt.substring(0, 50)}..."`);
+
+  const result = await model.generateContent(finalPrompt);
+  return result.response.text();
+}
