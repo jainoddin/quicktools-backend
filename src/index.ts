@@ -8,6 +8,7 @@ import toolsRoutes from './routes/tools.routes';
 import authRoutes from './routes/auth.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
+import './services/auth.service'; // Register passport strategies
 import { startCronJobs } from './cron/blogScheduler';
 
 const app = express();
