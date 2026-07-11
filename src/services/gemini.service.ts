@@ -35,45 +35,13 @@ const COVER_IMAGES: Record<string, string[]> = {
   ],
 };
 
-// 30 daily topics — rotate by day of year
-const DAILY_TOPICS = [
-  { topic: 'Top 10 AI tools for content creators in 2024', category: 'AI & Tools' },
-  { topic: 'How to use ChatGPT to 10x your productivity', category: 'Productivity' },
-  { topic: 'Best free AI image generators compared', category: 'AI & Tools' },
-  { topic: 'AI tools for small businesses', category: 'Business' },
-  { topic: 'How to remove image backgrounds with AI', category: 'AI & Tools' },
-  { topic: 'Best AI writing assistants for bloggers', category: 'AI & Tools' },
-  { topic: 'AI video generation — complete beginner guide', category: 'AI & Tools' },
-  { topic: 'Top 5 AI coding assistants for developers', category: 'Development' },
-  { topic: 'How to build a marketing strategy with AI', category: 'Marketing' },
-  { topic: 'Prompt engineering tips for better AI results', category: 'Tutorials' },
-  { topic: 'AI design tools that replace expensive software', category: 'Design' },
-  { topic: 'How to automate repetitive tasks with AI', category: 'Productivity' },
-  { topic: 'Best AI SEO tools to rank higher on Google', category: 'Marketing' },
-  { topic: 'AI for ecommerce — boost sales with AI tools', category: 'Business' },
-  { topic: 'How to use Gemini API in your web project', category: 'Development' },
-  { topic: 'AI tools for social media content creation', category: 'Marketing' },
-  { topic: 'Midjourney vs DALL-E 3 vs Stable Diffusion', category: 'AI & Tools' },
-  { topic: 'How to start freelancing with AI tools', category: 'Business' },
-  { topic: 'Best AI tools for students and researchers', category: 'Productivity' },
-  { topic: 'AI news — biggest updates this week', category: 'News & Updates' },
-  { topic: 'How to build a Next.js app with AI features', category: 'Development' },
-  { topic: 'AI voice generators — top 5 compared', category: 'AI & Tools' },
-  { topic: 'Building a personal brand using AI', category: 'Marketing' },
-  { topic: 'Best no-code AI tools for non-developers', category: 'Tutorials' },
-  { topic: 'How to write better with AI — 10 proven tips', category: 'Productivity' },
-  { topic: 'AI logo makers — build your brand for free', category: 'Design' },
-  { topic: 'How to use AI for customer support automation', category: 'Business' },
-  { topic: 'Top Chrome extensions powered by AI', category: 'AI & Tools' },
-  { topic: 'AI vs human — where AI beats humans in 2024', category: 'News & Updates' },
-  { topic: 'How to monetize AI skills in 2024', category: 'Business' },
+const CATEGORIES = [
+  'AI & Tools', 'Productivity', 'Development', 
+  'Design', 'Marketing', 'Business', 'News & Updates'
 ];
 
-function getTodaysTopic() {
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  return DAILY_TOPICS[dayOfYear % DAILY_TOPICS.length];
+function getRandomCategory() {
+  return CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
 }
 
 function getCoverImage(category: string): string {
@@ -108,17 +76,20 @@ export async function generateBlog(): Promise<{
   metaTitle: string;
   metaDescription: string;
 }> {
-  const { topic, category } = getTodaysTopic();
+  const category = getRandomCategory();
+  const today = new Date().toDateString();
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  const prompt = `You are a professional tech blogger for QuickTools.ai — a platform with 100+ AI tools.
+  const prompt = `You are an elite tech journalist for QuickTools.ai — a premium platform for AI tools.
+Today is ${today}. 
 
-Write a detailed, SEO-optimized blog post about: "${topic}"
+Your task is to write a highly engaging, breaking-news style blog post about a RECENT, real-world Artificial Intelligence update, new tool launch, or major tech trend within the "${category}" category. 
+Make it feel fresh, urgent, and highly relevant to people reading this today.
 
 Return ONLY valid JSON (no markdown, no code blocks) with this EXACT structure:
 {
-  "title": "Engaging blog title with keywords",
+  "title": "Catchy, news-style title with keywords",
   "description": "1-2 sentence compelling summary under 160 characters",
   "tags": ["tag1", "tag2", "tag3", "tag4"],
   "tableOfContents": ["Introduction", "section heading 1", "section heading 2", "section heading 3", "Conclusion"],
@@ -135,14 +106,14 @@ Return ONLY valid JSON (no markdown, no code blocks) with this EXACT structure:
 }
 
 Rules:
-- Content must be informative, practical, and relevant to QuickTools.ai users
-- Include at least 5-7 sections with ## headings
-- Use bullet points and numbered lists
-- Add relevant examples
-- Mention QuickTools.ai naturally 1-2 times
-- JSON must be valid — escape all quotes properly`;
+- Act as a news reporter. Use phrases like "Just recently...", "In the latest update...", or "Trending this week...".
+- Content must be informative, practical, and highly engaging.
+- Include at least 5-7 sections with ## headings.
+- Use bullet points and numbered lists.
+- Mention QuickTools.ai naturally 1-2 times as the go-to place for AI tools.
+- JSON must be valid — escape all quotes properly.`;
 
-  console.log(`🤖 Generating blog for topic: "${topic}"`);
+  console.log(`🤖 Generating dynamic news blog for category: "${category}" on ${today}`);
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
