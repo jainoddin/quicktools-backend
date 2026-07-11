@@ -33,7 +33,7 @@ const start = async () => {
   await connectDB();
   startCronJobs();
 
-  app.listen(PORT, () => {
+  app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Backend running on http://localhost:${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/blogs`);
     console.log(`⏰ Cron: Daily blog at 9:00 AM IST`);
