@@ -6,14 +6,7 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
 
-// Extend Express Request to include a user property
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-    }
-  }
-}
+// We don't need to declare global Express.Request.user because @types/passport already defines it.
 
 export const verifyAuth = (req: Request, res: Response, next: NextFunction) => {
   try {
