@@ -7,6 +7,7 @@ import cronRoutes from './routes/cron.routes';
 import toolsRoutes from './routes/tools.routes';
 import authRoutes from './routes/auth.routes';
 import paymentRoutes from './routes/payment.routes';
+import userRoutes from './routes/user.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import helmet from 'helmet';
@@ -41,6 +42,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/user', userRoutes);
 
 // TEMPORARY FIX ROUTE FOR IMAGES & DUPLICATES
 import { Blog } from './models/Blog';

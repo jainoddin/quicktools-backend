@@ -103,6 +103,8 @@ router.get('/me', async (req: Request, res: Response) => {
         avatar: user.avatar,
         role: user.role,
         savedTools: user.savedTools || [],
+        credits: user.credits || 0,
+        plan: user.plan || 'free',
       }
     });
 
