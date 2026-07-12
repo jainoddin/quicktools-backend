@@ -23,8 +23,8 @@ const UserSchema: Schema = new Schema(
     role: { type: String, default: 'user', enum: ['user', 'admin'] },
     savedTools: { type: [String], default: [] },
     favoriteImages: { type: [Object], default: [] },
-    credits: { type: Number, default: 50 },
-    plan: { type: String, default: 'free', enum: ['free', 'pro', 'business'] },
+    credits: { type: Number, default: 15 },
+    plan: { type: String, default: 'free', enum: ['free', 'starter', 'pro', 'business'] },
   },
   { timestamps: true }
 );

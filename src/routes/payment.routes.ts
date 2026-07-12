@@ -123,7 +123,7 @@ router.post('/verify', paymentRateLimit, async (req: Request, res: Response) => 
 
     // ⭐ UPGRADE USER ACCOUNT ⭐
     if (payment.userId) {
-      const credits = payment.plan === 'business' ? 100000 : 10000;
+      const credits = payment.plan === 'business' ? 100000 : payment.plan === 'starter' ? 500 : 10000;
       await User.findByIdAndUpdate(payment.userId, {
         plan: payment.plan,
         credits: credits
@@ -194,7 +194,7 @@ router.post('/cancel-plan', async (req: Request, res: Response) => {
     // Downgrade to free plan
     await User.findByIdAndUpdate(user._id, {
       plan: 'free',
-      credits: 50 // reset to free credits
+      credits: 15 // reset to free credits
     });
 
     // Mark all paid payments as 'cancelled' for this user
