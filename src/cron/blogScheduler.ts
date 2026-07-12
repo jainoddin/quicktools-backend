@@ -8,6 +8,15 @@ export function startCronJobs() {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
     try {
+      // Enforce exactly 1 blog per day
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const existingToday = await Blog.findOne({ publishedAt: { $gte: startOfDay } });
+      if (existingToday) {
+        console.log('⚠️ Blog already generated today. Skipping.');
+        return;
+      }
+
       const blogData = await generateBlog();
 
       // Avoid duplicate slugs

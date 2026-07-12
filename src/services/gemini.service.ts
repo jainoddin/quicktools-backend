@@ -2,38 +2,29 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Cover image map per category (Unsplash curated)
-const COVER_IMAGES: Record<string, string[]> = {
-  'AI & Tools': [
-    'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=800&q=80',
-    'https://images.unsplash.com/photo-1686191128892-3b37add4c844?w=800&q=80',
-    'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80',
-  ],
-  'Productivity': [
-    'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&q=80',
-    'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&q=80',
-  ],
-  'Development': [
-    'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&q=80',
-    'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=800&q=80',
-  ],
-  'Design': [
-    'https://images.unsplash.com/photo-1558655146-d09347e92766?w=800&q=80',
-    'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&q=80',
-  ],
-  'Marketing': [
-    'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=800&q=80',
-  ],
-  'Business': [
-    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
-  ],
-  'Tutorials': [
-    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80',
-  ],
-  'News & Updates': [
-    'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&q=80',
-  ],
-};
+// A large, curated pool of high-quality premium tech/business images from Unsplash.
+// By using a global pool, we guarantee visual variety regardless of category.
+const DYNAMIC_COVER_IMAGES: string[] = [
+  'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=800&q=80',
+  'https://images.unsplash.com/photo-1686191128892-3b37add4c844?w=800&q=80',
+  'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80',
+  'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&q=80',
+  'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&q=80',
+  'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&q=80',
+  'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=800&q=80',
+  'https://images.unsplash.com/photo-1558655146-d09347e92766?w=800&q=80',
+  'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&q=80',
+  'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=800&q=80',
+  'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
+  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80',
+  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&q=80',
+  'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80', // Network
+  'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80', // Circuit
+  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&q=80', // Finance/Money
+  'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80', // Dashboard
+  'https://images.unsplash.com/photo-1488229297570-58520851e868?w=800&q=80', // Code
+  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80', // Teamwork
+];
 
 const CATEGORIES = [
   'AI & Tools', 'Productivity', 'Development', 
@@ -44,9 +35,9 @@ function getRandomCategory() {
   return CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
 }
 
-function getCoverImage(category: string): string {
-  const images = COVER_IMAGES[category] || COVER_IMAGES['AI & Tools'];
-  return images[Math.floor(Math.random() * images.length)];
+function getCoverImage(): string {
+  // Always pick a completely random image from the large pool
+  return DYNAMIC_COVER_IMAGES[Math.floor(Math.random() * DYNAMIC_COVER_IMAGES.length)];
 }
 
 function generateSlug(title: string): string {
@@ -125,7 +116,7 @@ Rules:
   const generated = JSON.parse(jsonMatch[0]);
 
   const slug = generateSlug(generated.title);
-  const coverImage = getCoverImage(category);
+  const coverImage = getCoverImage();
 
   // Calculate read time from content (avg 200 words/min)
   const wordCount = generated.content.split(/\s+/).length;

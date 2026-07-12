@@ -9,7 +9,7 @@ dotenv.config();
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
 // The frontend URL to redirect to after successful login
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 
 // Helper function to generate JWT
 const generateToken = (user: IUser) => {
@@ -52,8 +52,22 @@ router.get(
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     });
 
-    // Redirect user to the frontend dashboard/tools page
-    res.redirect(`${FRONTEND_URL}/tools`);
+    // Set non-httpOnly cookie for optimistic UI rendering on the frontend
+    const userData = JSON.stringify({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar
+    });
+    res.cookie('user_data', encodeURIComponent(userData), {
+      httpOnly: false, // Must be accessible via JS document.cookie
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // Redirect user to the frontend dashboard page
+    res.redirect(`${FRONTEND_URL}/dashboard`);
   }
 );
 
@@ -106,7 +120,35 @@ router.post('/logout', (req: Request, res: Response) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
+  res.clearCookie('user_data', {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  });
   res.json({ message: 'Logged out successfully' });
+});
+
+// ==========================================
+// 5. Update Profile (name, bio)
+// ==========================================
+router.put('/profile', async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ message: 'Not authenticated' });
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const { name, bio } = req.body;
+    if (name) user.name = name;
+    if (bio !== undefined) (user as any).bio = bio;
+    await user.save();
+
+    res.json({ success: true, user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar } });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 export default router;

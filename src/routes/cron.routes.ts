@@ -14,6 +14,15 @@ router.post('/generate-blog', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
+    // Enforce exactly 1 blog per day
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const existingToday = await Blog.findOne({ publishedAt: { $gte: startOfDay } });
+    if (existingToday) {
+      console.log('⚠️ Blog already generated today. Skipping.');
+      return res.json({ success: true, message: 'Already generated a blog today. Skipping.' });
+    }
+
     console.log('⏰ Cron job triggered — generating blog...');
 
     // Generate blog from Gemini
