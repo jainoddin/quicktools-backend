@@ -83,7 +83,7 @@ router.post('/generate-text', verifyAuth, async (req: Request, res: Response) =>
 });
 
 // POST /api/tools/generate-image
-// ✅ Auth required — prevents bots from free abuse
+// Guests: 1 free generation (IP rate limited). Auth users: credit system.
 router.post('/generate-image', imageGenerationLimiter, async (req: Request, res: Response) => {
   try {
     const { prompt, model, style, ratio, quality } = req.body;
@@ -94,42 +94,8 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
     if (prompt.length > 1000) {
       return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 1000 characters.' });
     }
-
-    // ✅ AUTH CHECK — login required
-    const token = req.cookies?.token;
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please login to generate images.',
-        errorType: 'AUTH_REQUIRED'
-      });
-    }
-
-    let userId: string | null = null;
-    let userPlan = 'free';
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      userId = decoded.id;
-    } catch (err) {
-      return res.status(401).json({ success: false, message: 'Invalid session. Please login again.', errorType: 'AUTH_REQUIRED' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found. Please login again.' });
-    }
-    userPlan = user.plan;
-
-    const creditsNeeded = 5; // Image generation costs 5 credits
-    if (user.plan === 'free' && user.credits < creditsNeeded) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not enough credits. Please upgrade to generate more images.',
-        errorType: 'INSUFFICIENT_CREDITS'
-      });
-    }
     
-    // Construct Pollinations URL via the backend
+    // Construct Pollinations URL
     const fullPrompt = `Model: ${model || 'dall-e-3'}, Style: ${style || 'Realistic'}, ${prompt.trim()}`;
     const encodedPrompt = encodeURIComponent(fullPrompt);
     
@@ -150,19 +116,42 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
 
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
 
-    // Deduct credits and track usage
-    if (user.plan === 'free') {
-      user.credits -= creditsNeeded;
-      await user.save();
+    // Optional auth — if logged in, use credit system
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const user = await User.findById(decoded.id);
+        
+        if (user) {
+          const creditsNeeded = 5;
+          if (user.plan === 'free' && user.credits < creditsNeeded) {
+            return res.status(403).json({ 
+              success: false, 
+              message: 'Not enough credits. Please upgrade to generate more images.',
+              errorType: 'INSUFFICIENT_CREDITS'
+            });
+          }
+          // Deduct credits
+          if (user.plan === 'free') {
+            user.credits -= creditsNeeded;
+            await user.save();
+          }
+          await ToolUsage.create({
+            userId: user._id,
+            toolSlug: '/tools/ai-image-generator',
+            toolName: 'AI Image Generator',
+            prompt: prompt.substring(0, 500),
+            result: imageUrl,
+            creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+          });
+        }
+      } catch (authErr) {
+        // Token invalid — treat as guest (IP rate limit protects us)
+        console.error('Auth check in image gen failed, treating as guest:', authErr);
+      }
     }
-    await ToolUsage.create({
-      userId: user._id,
-      toolSlug: '/tools/ai-image-generator',
-      toolName: 'AI Image Generator',
-      prompt: prompt.substring(0, 500),
-      result: imageUrl,
-      creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
-    });
+    // If no token → guest user, IP rate limit (10/15min) is the protection
 
     // Pre-fetch the image to ensure Pollinations generates it and it's ready for the frontend browser
     try {
