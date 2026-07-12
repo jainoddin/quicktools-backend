@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { generateToolText } from '../services/gemini.service';
 import { verifyAuth } from '../middlewares/auth.middleware';
 import { User } from '../models/user.model';
 import { ToolUsage } from '../models/toolUsage.model';
 import rateLimit from 'express-rate-limit';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
 
 const router = Router();
 
@@ -22,6 +25,9 @@ router.post('/generate-text', verifyAuth, async (req: Request, res: Response) =>
 
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required' });
+    }
+    if (prompt.length > 2000) {
+      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
     }
 
     // 1. Check user credits
@@ -77,6 +83,7 @@ router.post('/generate-text', verifyAuth, async (req: Request, res: Response) =>
 });
 
 // POST /api/tools/generate-image
+// ✅ Auth required — prevents bots from free abuse
 router.post('/generate-image', imageGenerationLimiter, async (req: Request, res: Response) => {
   try {
     const { prompt, model, style, ratio, quality } = req.body;
@@ -84,13 +91,49 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required' });
     }
+    if (prompt.length > 1000) {
+      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 1000 characters.' });
+    }
+
+    // ✅ AUTH CHECK — login required
+    const token = req.cookies?.token;
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please login to generate images.',
+        errorType: 'AUTH_REQUIRED'
+      });
+    }
+
+    let userId: string | null = null;
+    let userPlan = 'free';
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      userId = decoded.id;
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Invalid session. Please login again.', errorType: 'AUTH_REQUIRED' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found. Please login again.' });
+    }
+    userPlan = user.plan;
+
+    const creditsNeeded = 5; // Image generation costs 5 credits
+    if (user.plan === 'free' && user.credits < creditsNeeded) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not enough credits. Please upgrade to generate more images.',
+        errorType: 'INSUFFICIENT_CREDITS'
+      });
+    }
     
     // Construct Pollinations URL via the backend
     const fullPrompt = `Model: ${model || 'dall-e-3'}, Style: ${style || 'Realistic'}, ${prompt.trim()}`;
     const encodedPrompt = encodeURIComponent(fullPrompt);
     
     let width = 1024, height = 1024;
-    
     if (quality === 'standard') {
       if (ratio === '1:1') { width = 512; height = 512; }
       else if (ratio === '16:9') { width = 640; height = 360; }
@@ -98,7 +141,6 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
       else if (ratio === '4:3') { width = 512; height = 384; }
       else { width = 512; height = 512; }
     } else {
-      // HD Quality
       if (ratio === '1:1') { width = 1024; height = 1024; }
       else if (ratio === '16:9') { width = 1280; height = 720; }
       else if (ratio === '9:16') { width = 720; height = 1280; }
@@ -108,41 +150,19 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
 
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
 
-    // Optional Authentication & Credit Check
-    const token = req.cookies.token;
-    if (token) {
-      try {
-        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change') as any;
-        const user = await User.findById(decoded.id);
-        
-        if (user) {
-          const creditsNeeded = 5; // Image generation is expensive, costs 5 credits
-          
-          if (user.credits < creditsNeeded) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Not enough credits. Please upgrade to generate more images.',
-              errorType: 'INSUFFICIENT_CREDITS'
-            });
-          }
-          
-          // Deduct credits and track usage for all users
-          user.credits -= creditsNeeded;
-          await user.save();
-          
-          await ToolUsage.create({
-            userId: user._id,
-            toolSlug: '/tools/ai-image-generator',
-            toolName: 'AI Image Generator',
-            prompt: prompt.substring(0, 500),
-            result: imageUrl, // Store the actual URL so they can see it in history
-            creditsUsed: creditsNeeded,
-          });
-        }
-      } catch (authErr) {
-        console.error('Auth verification in image gen failed', authErr);
-      }
+    // Deduct credits and track usage
+    if (user.plan === 'free') {
+      user.credits -= creditsNeeded;
+      await user.save();
     }
+    await ToolUsage.create({
+      userId: user._id,
+      toolSlug: '/tools/ai-image-generator',
+      toolName: 'AI Image Generator',
+      prompt: prompt.substring(0, 500),
+      result: imageUrl,
+      creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+    });
 
     // Pre-fetch the image to ensure Pollinations generates it and it's ready for the frontend browser
     try {

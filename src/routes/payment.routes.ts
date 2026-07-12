@@ -1,8 +1,11 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import { createRazorpayOrder, verifyPaymentSignature } from '../services/razorpay.service';
 import Payment from '../models/Payment.model';
 import { User } from '../models/user.model';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
 
 const router = Router();
 
@@ -21,7 +24,19 @@ const paymentRateLimit = rateLimit({
 // ──────────────────────────────────────────────
 router.post('/create-order', paymentRateLimit, async (req: Request, res: Response) => {
   try {
-    const { plan = 'pro', email } = req.body;
+    const { plan = 'pro' } = req.body;
+
+    // ✅ SECURITY: userId from JWT token (NOT from request body!)
+    let userId: string | undefined;
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        userId = decoded.id;
+      } catch (_) {
+        // unauthenticated — userId stays undefined
+      }
+    }
 
     // Amount lo define cheyyi — frontend trust kaakudadu!
     // ₹1 = 100 paise
@@ -32,7 +47,7 @@ router.post('/create-order', paymentRateLimit, async (req: Request, res: Respons
       test:     100,     // ₹1 test
     };
 
-    const amountInPaise = PLAN_AMOUNTS[plan] ?? 100; // default ₹1
+    const amountInPaise = PLAN_AMOUNTS[plan] ?? 100;
 
     // Razorpay order create
     const order = await createRazorpayOrder(amountInPaise);
@@ -44,8 +59,8 @@ router.post('/create-order', paymentRateLimit, async (req: Request, res: Respons
       currency:        'INR',
       status:          'created',
       plan,
-      userId:          req.body.userId,
-      email:           req.body.email || email,
+      userId,                  // ✅ from JWT, not req.body
+      email:           req.body.email,
     });
 
     res.json({
@@ -53,7 +68,7 @@ router.post('/create-order', paymentRateLimit, async (req: Request, res: Respons
       orderId:  order.id,
       amount:   amountInPaise,
       currency: 'INR',
-      keyId:    process.env.RAZORPAY_KEY_ID, // public key — frontend ki safe ga pathiddam
+      keyId:    process.env.RAZORPAY_KEY_ID,
     });
 
   } catch (err: any) {
@@ -152,9 +167,6 @@ router.get('/status/:orderId', async (req: Request, res: Response) => {
 // POST /api/payment/cancel-plan
 // User plan ni free lo ki downgrade cheyyadam
 // ──────────────────────────────────────────────
-import jwt from 'jsonwebtoken';
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
-
 router.post('/cancel-plan', async (req: Request, res: Response) => {
   try {
     // Auth check
