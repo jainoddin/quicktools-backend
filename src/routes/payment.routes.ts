@@ -148,4 +148,61 @@ router.get('/status/:orderId', async (req: Request, res: Response) => {
   }
 });
 
+// ──────────────────────────────────────────────
+// POST /api/payment/cancel-plan
+// User plan ni free lo ki downgrade cheyyadam
+// ──────────────────────────────────────────────
+import jwt from 'jsonwebtoken';
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
+
+router.post('/cancel-plan', async (req: Request, res: Response) => {
+  try {
+    // Auth check
+    const token = req.cookies?.token;
+    if (!token) {
+      res.status(401).json({ success: false, error: 'Not authenticated' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    if (user.plan === 'free') {
+      res.status(400).json({ success: false, error: 'Already on Free plan' });
+      return;
+    }
+
+    const previousPlan = user.plan;
+
+    // Downgrade to free plan
+    await User.findByIdAndUpdate(user._id, {
+      plan: 'free',
+      credits: 50 // reset to free credits
+    });
+
+    // Mark all paid payments as 'cancelled' for this user
+    await Payment.updateMany(
+      { userId: user._id, status: 'paid' },
+      { status: 'cancelled' }
+    );
+
+    console.log(`⚠️ User ${user._id} cancelled ${previousPlan} plan, downgraded to free.`);
+
+    res.json({
+      success: true,
+      message: 'Plan cancelled successfully. You have been downgraded to the Free plan.',
+      previousPlan,
+    });
+
+  } catch (err: any) {
+    console.error('❌ Cancel plan error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to cancel plan' });
+  }
+});
+
 export default router;
