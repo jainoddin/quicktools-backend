@@ -102,6 +102,7 @@ router.get('/me', async (req: Request, res: Response) => {
         email: user.email,
         avatar: user.avatar,
         role: user.role,
+        savedTools: user.savedTools || [],
       }
     });
 
@@ -148,6 +149,42 @@ router.put('/profile', async (req: Request, res: Response) => {
     res.json({ success: true, user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar } });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ==========================================
+// 6. Toggle Star for a Tool
+// ==========================================
+router.put('/tools/:slug/star', async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const { slug } = req.params;
+    if (!slug) return res.status(400).json({ success: false, message: 'Tool slug is required' });
+
+    const savedTools = user.savedTools || [];
+    const index = savedTools.indexOf(slug);
+
+    if (index > -1) {
+      // Remove from saved tools
+      savedTools.splice(index, 1);
+    } else {
+      // Add to saved tools
+      savedTools.push(slug);
+    }
+
+    user.savedTools = savedTools;
+    await user.save();
+
+    res.json({ success: true, savedTools: user.savedTools });
+  } catch (error) {
+    console.error('Error toggling star:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
