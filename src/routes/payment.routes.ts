@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { createRazorpayOrder, verifyPaymentSignature } from '../services/razorpay.service';
 import Payment from '../models/Payment.model';
+import { User } from '../models/user.model';
 
 const router = Router();
 
@@ -103,6 +104,16 @@ router.post('/verify', paymentRateLimit, async (req: Request, res: Response) => 
     if (!payment) {
       res.status(404).json({ success: false, error: 'Order not found' });
       return;
+    }
+
+    // ⭐ UPGRADE USER ACCOUNT ⭐
+    if (payment.userId) {
+      const credits = payment.plan === 'business' ? 100000 : 10000;
+      await User.findByIdAndUpdate(payment.userId, {
+        plan: payment.plan,
+        credits: credits
+      });
+      console.log(`🚀 Upgraded User ${payment.userId} to ${payment.plan} with ${credits} credits!`);
     }
 
     console.log(`✅ Payment successful: ${razorpayPaymentId} | Amount: ₹${payment.amount / 100}`);
