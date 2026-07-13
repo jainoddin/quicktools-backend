@@ -17,6 +17,47 @@ const imageGenerationLimiter = rateLimit({
   message: { success: false, message: 'Too many images generated from this IP, please try again after 15 minutes' }
 });
 
+// GET /api/tools
+router.get('/', (req: Request, res: Response) => {
+  const tools = [
+    {
+      title: 'AI Image Generator',
+      slug: 'ai-image-generator',
+      category: 'Design',
+      image: 'https://cdn-icons-png.flaticon.com/512/8345/8345328.png'
+    },
+    {
+      title: 'Background Remover',
+      slug: 'background-remover',
+      category: 'Design',
+      image: 'https://cdn-icons-png.flaticon.com/512/10051/10051515.png'
+    },
+    {
+      title: 'AI Writer',
+      slug: 'ai-writer',
+      category: 'Productivity',
+      image: 'https://cdn-icons-png.flaticon.com/512/11186/11186638.png'
+    },
+    {
+      title: 'AI Video Generator',
+      slug: 'ai-video-generator',
+      category: 'Marketing',
+      image: 'https://cdn-icons-png.flaticon.com/512/8061/8061266.png'
+    },
+    {
+      title: 'AI Code Generator',
+      slug: 'ai-code-generator',
+      category: 'Development',
+      image: 'https://cdn-icons-png.flaticon.com/512/10051/10051410.png'
+    }
+  ];
+  
+  res.json({
+    success: true,
+    data: tools
+  });
+});
+
 // POST /api/tools/generate-text
 router.post('/generate-text', verifyAuth, async (req: Request, res: Response) => {
   try {

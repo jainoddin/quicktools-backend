@@ -18,6 +18,7 @@ export interface IBlog extends Document {
   whatYoullLearn: string[];
   content: string;
   relatedSlugs: string[];
+  faq?: { question: string; answer: string }[];
   metaTitle: string;
   metaDescription: string;
 }
@@ -47,6 +48,10 @@ const BlogSchema = new Schema<IBlog>(
     whatYoullLearn: [{ type: String }],
     content: { type: String, required: true },
     relatedSlugs: [{ type: String }],
+    faq: [{ 
+      question: { type: String }, 
+      answer: { type: String } 
+    }],
 
     // SEO
     metaTitle: { type: String, required: true },

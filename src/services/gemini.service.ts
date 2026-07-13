@@ -1,44 +1,30 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Blog } from '../models/Blog';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// A large, curated pool of high-quality premium tech/business images from Unsplash.
-// By using a global pool, we guarantee visual variety regardless of category.
-const DYNAMIC_COVER_IMAGES: string[] = [
-  'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=800&q=80',
-  'https://images.unsplash.com/photo-1686191128892-3b37add4c844?w=800&q=80',
-  'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80',
-  'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&q=80',
-  'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&q=80',
-  'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&q=80',
-  'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=800&q=80',
-  'https://images.unsplash.com/photo-1558655146-d09347e92766?w=800&q=80',
-  'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&q=80',
-  'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=800&q=80',
-  'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
-  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80',
-  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&q=80',
-  'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80', // Network
-  'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80', // Circuit
-  'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&q=80', // Finance/Money
-  'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80', // Dashboard
-  'https://images.unsplash.com/photo-1488229297570-58520851e868?w=800&q=80', // Code
-  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80', // Teamwork
+const SEO_KEYWORDS = [
+  { keyword: "Best AI Tools", category: "AI & Tools" },
+  { keyword: "AI Resume Builder", category: "AI & Tools" },
+  { keyword: "AI Image Generator", category: "Design" },
+  { keyword: "AI Logo Generator", category: "Design" },
+  { keyword: "ChatGPT Prompts", category: "Productivity" },
+  { keyword: "Claude AI", category: "AI & Tools" },
+  { keyword: "Gemini AI", category: "AI & Tools" },
+  { keyword: "Perplexity AI", category: "Productivity" },
+  { keyword: "AI Coding Tools", category: "Development" },
+  { keyword: "Best Free AI Tools", category: "AI & Tools" },
+  { keyword: "AI Productivity Tools", category: "Productivity" },
+  { keyword: "AI Writing Assistant", category: "Productivity" },
+  { keyword: "AI Video Generator", category: "Marketing" },
+  { keyword: "AI Voice Generator", category: "Marketing" },
+  { keyword: "AI Presentation Maker", category: "Business" },
+  { keyword: "AI SEO Tools", category: "Marketing" },
+  { keyword: "AI Marketing Tools", category: "Marketing" },
+  { keyword: "AI Email Generator", category: "Business" },
+  { keyword: "AI Website Builder", category: "Development" },
+  { keyword: "AI Business Ideas", category: "Business" }
 ];
-
-const CATEGORIES = [
-  'AI & Tools', 'Productivity', 'Development', 
-  'Design', 'Marketing', 'Business', 'News & Updates'
-];
-
-function getRandomCategory() {
-  return CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-}
-
-function getCoverImage(): string {
-  // Always pick a completely random image from the large pool
-  return DYNAMIC_COVER_IMAGES[Math.floor(Math.random() * DYNAMIC_COVER_IMAGES.length)];
-}
 
 function generateSlug(title: string): string {
   return title
@@ -49,76 +35,113 @@ function generateSlug(title: string): string {
     .trim();
 }
 
-export async function generateBlog(): Promise<{
-  slug: string;
-  title: string;
-  description: string;
-  category: string;
-  tags: string[];
-  coverImage: string;
-  author: { name: string; avatar: string };
-  readTime: string;
-  publishedAt: Date;
-  featured: boolean;
-  tableOfContents: string[];
-  whatYoullLearn: string[];
-  content: string;
-  relatedSlugs: string[];
-  metaTitle: string;
-  metaDescription: string;
-}> {
-  const category = getRandomCategory();
-  const today = new Date().toDateString();
+export async function generateBlog(): Promise<any> {
+  // 1. Fetch all existing blogs to avoid duplicate keywords and slugs
+  const existingBlogs = await Blog.find({}, 'title slug category').lean();
+  
+  // 2. Filter out keywords that we have already written about (Duplicate Topic Prevention)
+  // We check if the existing blog titles closely match our keyword pool
+  const usedKeywords = existingBlogs.map(b => b.title.toLowerCase());
+  
+  let availableKeywords = SEO_KEYWORDS.filter(k => 
+    !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
+  );
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  // If we somehow exhausted all keywords, reset the pool (or we could fetch more from AI)
+  if (availableKeywords.length === 0) {
+    console.log("⚠️ All keywords from the pool are used. Reusing existing keywords pool.");
+    availableKeywords = SEO_KEYWORDS;
+  }
 
-  const prompt = `You are an elite tech journalist for QuickTools.ai — a premium platform for AI tools.
-Today is ${today}. 
+  // 3. Select a unique topic
+  const randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+  const { keyword, category } = randomTopic;
 
-Your task is to write a highly engaging, breaking-news style blog post about a RECENT, real-world Artificial Intelligence update, new tool launch, or major tech trend within the "${category}" category. 
-Make it feel fresh, urgent, and highly relevant to people reading this today.
+  // 4. Get Related Posts (Auto Related Posts)
+  // Get 3 random blogs from the same category, or just any category if not enough
+  let relatedBlogs = existingBlogs.filter(b => b.category === category);
+  if (relatedBlogs.length < 3) {
+    relatedBlogs = existingBlogs; // fallback
+  }
+  const shuffledRelated = relatedBlogs.sort(() => 0.5 - Math.random()).slice(0, 3);
+  const relatedSlugs = shuffledRelated.map(b => b.slug);
 
-Return ONLY valid JSON (no markdown, no code blocks) with this EXACT structure:
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0.7, 
+    }
+  });
+
+  const prompt = `You are a Senior SEO Content Strategist and AI Journalist writing for QuickTools.ai — a premium platform for AI tools.
+
+Write a comprehensive, engaging, and high-quality blog around this keyword:
+
+Primary Keyword: ${keyword}
+
+Requirements:
+- 1800-2500 words minimum.
+- Human writing style (avoid AI sounding phrases like "in conclusion", "it's important to note").
+- Original and captivating introduction.
+- Clear H2 and H3 headings.
+- Include a comparison table or pros and cons section.
+- Provide real-world examples and use cases.
+- Include the latest industry information.
+- A dedicated FAQ section with 5-8 common questions.
+- A strong conclusion.
+- Mention QuickTools.ai naturally 2-3 times as the go-to place for discovering AI tools.
+- Highly SEO optimized, beginner-friendly, but with expert-level insights.
+
+Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape all strings properly. Use this EXACT structure:
 {
-  "title": "Catchy, news-style title with keywords",
-  "description": "1-2 sentence compelling summary under 160 characters",
-  "tags": ["tag1", "tag2", "tag3", "tag4"],
-  "tableOfContents": ["Introduction", "section heading 1", "section heading 2", "section heading 3", "Conclusion"],
+  "title": "Catchy SEO optimized title including the keyword",
+  "description": "Compelling meta description under 160 characters",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "tableOfContents": ["Introduction", "Heading 1", "Heading 2", "FAQ", "Conclusion"],
   "whatYoullLearn": [
     "Specific actionable takeaway 1",
-    "Specific actionable takeaway 2", 
+    "Specific actionable takeaway 2",
     "Specific actionable takeaway 3",
     "Specific actionable takeaway 4"
   ],
-  "content": "Full blog post in markdown format. Include headings (##), bullet points, bold text, code blocks if relevant. Minimum 800 words.",
-  "metaTitle": "SEO title under 60 characters",
-  "metaDescription": "SEO description under 160 characters",
+  "content": "Full blog post in markdown format. Start with ## Introduction. Include H2 (##), H3 (###), **bold**, lists, and tables. \nCRUCIAL: You MUST include 4 to 5 inline images throughout the content using this exact markdown format: ![Descriptive Alt Text](https://image.pollinations.ai/prompt/Highly%20detailed%20description%20of%20the%20image%20related%20to%20the%20section%20futuristic%20clean%20high%20quality?width=800&height=400&nologo=true). Space these images out evenly between major H2 sections.",
+  "faq": [
+    {"question": "Question 1", "answer": "Answer 1"},
+    {"question": "Question 2", "answer": "Answer 2"}
+  ],
+  "metaTitle": "SEO optimized meta title under 60 characters",
+  "metaDescription": "SEO optimized meta description under 160 characters",
   "readTime": "X min read"
 }
+`;
 
-Rules:
-- Act as a news reporter. Use phrases like "Just recently...", "In the latest update...", or "Trending this week...".
-- Content must be informative, practical, and highly engaging.
-- Include at least 5-7 sections with ## headings.
-- Use bullet points and numbered lists.
-- Mention QuickTools.ai naturally 1-2 times as the go-to place for AI tools.
-- JSON must be valid — escape all quotes properly.`;
+  console.log(`🤖 Generating enterprise SEO blog for keyword: "${keyword}" in category: "${category}"`);
 
-  console.log(`🤖 Generating dynamic news blog for category: "${category}" on ${today}`);
+  let text = "";
+  try {
+    const result = await model.generateContent(prompt);
+    text = result.response.text();
+  } catch (error) {
+    console.error("❌ Failed to generate content from Gemini:", error);
+    throw error;
+  }
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  // Extract JSON from response
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No valid JSON found in Gemini response');
+  if (!jsonMatch) {
+    console.error("Failed to parse JSON. Raw response:", text);
+    throw new Error('No valid JSON found in Gemini response');
+  }
 
-  const generated = JSON.parse(jsonMatch[0]);
+  let generated;
+  try {
+    generated = JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error("JSON Parsing Error:", error);
+    throw new Error("Invalid JSON generated by AI.");
+  }
 
   const slug = generateSlug(generated.title);
-  const coverImage = getCoverImage();
 
-  // Calculate read time from content (avg 200 words/min)
   const wordCount = generated.content.split(/\s+/).length;
   const readTime = generated.readTime || `${Math.ceil(wordCount / 200)} min read`;
 
@@ -128,7 +151,7 @@ Rules:
     description: generated.description,
     category,
     tags: generated.tags || [],
-    coverImage,
+    coverImage: `https://image.pollinations.ai/prompt/${encodeURIComponent(generated.title + ' modern 3D illustration professional high quality')}?width=1200&height=800&nologo=true`,
     author: {
       name: 'QuickTools AI',
       avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',
@@ -139,7 +162,8 @@ Rules:
     tableOfContents: generated.tableOfContents || [],
     whatYoullLearn: generated.whatYoullLearn || [],
     content: generated.content,
-    relatedSlugs: [],
+    faq: generated.faq || [],
+    relatedSlugs,
     metaTitle: generated.metaTitle || generated.title,
     metaDescription: generated.metaDescription || generated.description,
   };
@@ -155,7 +179,7 @@ export async function generateToolText(params: {
   const model = genAI.getGenerativeModel({ 
     model: 'gemini-2.5-flash',
     generationConfig: {
-      temperature: params.creativity / 10, // Maps 1-10 to 0.1-1.0
+      temperature: params.creativity / 10,
     }
   });
 

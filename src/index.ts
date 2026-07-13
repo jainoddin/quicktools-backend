@@ -8,6 +8,8 @@ import toolsRoutes from './routes/tools.routes';
 import authRoutes from './routes/auth.routes';
 import paymentRoutes from './routes/payment.routes';
 import userRoutes from './routes/user.routes';
+import articleRoutes from './routes/article.routes';
+import newsRoutes from './routes/news.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import helmet from 'helmet';
@@ -43,6 +45,8 @@ app.use('/api/tools', toolsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/articles', articleRoutes);
+app.use('/api/news', newsRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)
 
