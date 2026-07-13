@@ -12,6 +12,7 @@ import articleRoutes from './routes/article.routes';
 import newsRoutes from './routes/news.routes';
 import subscriberRoutes from './routes/subscriberRoutes';
 import statsRoutes from './routes/stats.routes';
+import contactRoutes from './routes/contact.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import helmet from 'helmet';
@@ -51,6 +52,7 @@ app.use('/api/articles', articleRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/subscribe', subscriberRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/contact', contactRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)
 

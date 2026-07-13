@@ -49,3 +49,26 @@ export const sendWelcomeEmail = async (toEmail: string) => {
     return false;
   }
 };
+
+export const sendAdminNotificationEmail = async (subject: string, contentHTML: string) => {
+  try {
+    if (!process.env.EMAIL_PASS) {
+      console.warn("EMAIL_PASS not set in .env. Skipping admin notification email.");
+      return false;
+    }
+
+    const adminEmail = process.env.EMAIL_USER || 'helloquicktool@gmail.com';
+
+    const info = await transporter.sendMail({
+      from: `"QuickTools AI System" <${adminEmail}>`,
+      to: adminEmail, // Send to the company email
+      subject: subject,
+      html: contentHTML,
+    });
+    console.log("Admin notification email sent: %s", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending admin notification email:", error);
+    return false;
+  }
+};
