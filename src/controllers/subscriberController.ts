@@ -29,6 +29,7 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
       }
       
       // Already active
+      console.log(`Email ${email} is already subscribed. Skipping welcome email.`);
       res.status(200).json({ success: true, message: 'Email is already subscribed' });
       return;
     }
