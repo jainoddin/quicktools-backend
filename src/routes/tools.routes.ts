@@ -59,10 +59,19 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // POST /api/tools/generate-text
-router.post('/generate-text', verifyAuth, async (req: Request, res: Response) => {
+router.post('/generate-text', async (req: Request, res: Response) => {
   try {
     const { prompt, contentType, tone, language, creativity, toolSlug, toolName } = req.body;
-    const userId = (req.user as any).id;
+    
+    // Optional Auth
+    const token = req.cookies.token;
+    let userId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        userId = decoded.id;
+      } catch (err) {}
+    }
 
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required' });
@@ -71,17 +80,18 @@ router.post('/generate-text', verifyAuth, async (req: Request, res: Response) =>
       return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
     }
 
-    // 1. Check user credits
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
+    let user = null;
     const creditsNeeded = 2; // AI Writer / Code uses 2 credits
 
-    if (user.plan === 'free' && user.credits < creditsNeeded) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Not enough credits. Please upgrade to Premium.' 
-      });
+    // 1. Check user credits if authenticated
+    if (userId) {
+      user = await User.findById(userId);
+      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade to Premium.' 
+        });
+      }
     }
 
     // 2. Generate content
@@ -93,25 +103,27 @@ router.post('/generate-text', verifyAuth, async (req: Request, res: Response) =>
       creativity: creativity || 6,
     });
 
-    // 3. Deduct credits and track usage
-    if (user.plan === 'free') {
-      user.credits -= creditsNeeded;
-      await user.save();
-    }
+    // 3. Deduct credits and track usage for authenticated users
+    if (user) {
+      if (user.plan === 'free') {
+        user.credits -= creditsNeeded;
+        await user.save();
+      }
 
-    await ToolUsage.create({
-      userId: user._id,
-      toolSlug: toolSlug || '/tools/ai-writer',
-      toolName: toolName || 'AI Writer',
-      prompt: prompt.substring(0, 500), // Save first 500 chars of prompt
-      result: 'Generated content successfully',
-      creditsUsed: user.plan === 'free' ? creditsNeeded : 0, // 0 if premium (unlimited)
-    });
+      await ToolUsage.create({
+        userId: user._id,
+        toolSlug: toolSlug || '/tools/ai-writer',
+        toolName: toolName || 'AI Writer',
+        prompt: prompt.substring(0, 500),
+        result: text,
+        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+      });
+    }
 
     res.json({
       success: true,
       data: text,
-      creditsRemaining: user.plan === 'free' ? user.credits : 'Unlimited'
+      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
     });
   } catch (error) {
     console.error('❌ Text generation failed:', error);
@@ -267,10 +279,19 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
 });
 
 // POST /api/tools/generate-code
-router.post('/generate-code', verifyAuth, async (req: Request, res: Response) => {
+router.post('/generate-code', async (req: Request, res: Response) => {
   try {
     const { prompt, language, framework, codeType } = req.body;
-    const userId = (req.user as any).id;
+    
+    // Optional Auth
+    const token = req.cookies.token;
+    let userId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        userId = decoded.id;
+      } catch (err) {}
+    }
 
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required' });
@@ -279,17 +300,18 @@ router.post('/generate-code', verifyAuth, async (req: Request, res: Response) =>
       return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
     }
 
-    // 1. Check user credits
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
+    let user = null;
     const creditsNeeded = 2; // Code generator uses 2 credits
 
-    if (user.plan === 'free' && user.credits < creditsNeeded) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Not enough credits. Please upgrade to Premium.' 
-      });
+    // 1. Check user credits if authenticated
+    if (userId) {
+      user = await User.findById(userId);
+      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade to Premium.' 
+        });
+      }
     }
 
     // 2. Generate code
@@ -300,28 +322,30 @@ router.post('/generate-code', verifyAuth, async (req: Request, res: Response) =>
       codeType: codeType || 'Frontend (Web)'
     });
 
-    // 3. Deduct credits and track usage
-    if (user.plan === 'free') {
-      user.credits -= creditsNeeded;
-      await user.save();
-    }
+    // 3. Deduct credits and track usage for authenticated users
+    if (user) {
+      if (user.plan === 'free') {
+        user.credits -= creditsNeeded;
+        await user.save();
+      }
 
-    await ToolUsage.create({
-      userId: user._id,
-      toolSlug: '/tools/ai-code-generator',
-      toolName: 'AI Code Generator',
-      prompt: prompt.substring(0, 500),
-      result: JSON.stringify({
-        html: generatedCode.html.substring(0, 100),
-        explanation: generatedCode.explanation
-      }),
-      creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
-    });
+      await ToolUsage.create({
+        userId: user._id,
+        toolSlug: '/tools/ai-code',
+        toolName: 'AI Code Generator',
+        prompt: prompt.substring(0, 500),
+        result: JSON.stringify({
+          html: generatedCode.html ? generatedCode.html.substring(0, 100) : '',
+          explanation: generatedCode.explanation
+        }),
+        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+      });
+    }
 
     res.json({
       success: true,
       data: generatedCode,
-      creditsRemaining: user.plan === 'free' ? user.credits : 'Unlimited'
+      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
     });
   } catch (error) {
     console.error('❌ Code generation failed:', error);

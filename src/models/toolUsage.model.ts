@@ -7,6 +7,7 @@ export interface IToolUsage extends Document {
   prompt: string;
   result: string;
   creditsUsed: number;
+  isStarred?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +20,7 @@ const ToolUsageSchema: Schema = new Schema(
     prompt: { type: String, required: true },
     result: { type: String },
     creditsUsed: { type: Number, required: true, default: 1 },
+    isStarred: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

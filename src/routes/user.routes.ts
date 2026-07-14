@@ -91,6 +91,46 @@ router.get('/usage', authenticate, async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/user/usage/:id/favorite
+router.patch('/usage/:id/favorite', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const usageId = req.params.id;
+    
+    const usage = await ToolUsage.findOne({ _id: usageId, userId: user._id });
+    if (!usage) {
+      return res.status(404).json({ success: false, message: 'History item not found' });
+    }
+    
+    usage.isStarred = !usage.isStarred;
+    await usage.save();
+    
+    res.json({ success: true, isStarred: usage.isStarred });
+  } catch (error) {
+    console.error('Error updating favorite:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/user/usage
+router.delete('/usage', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing ids array' });
+    }
+    
+    await ToolUsage.deleteMany({ _id: { $in: ids }, userId: user._id });
+    
+    res.json({ success: true, message: 'Deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting usage history:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/user/favorites
 router.get('/favorites', authenticate, async (req: Request, res: Response) => {
   try {
