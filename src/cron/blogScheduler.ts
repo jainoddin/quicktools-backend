@@ -8,7 +8,7 @@ import { generateNews } from '../services/newsGenerator';
 
 // Runs every day at 9:00 AM IST
 export function startCronJobs() {
-  cron.schedule('0 9 * * *', async () => {
+  cron.schedule('0 9-23 * * *', async () => {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
     try {
@@ -41,7 +41,7 @@ export function startCronJobs() {
   });
 
   // Runs every day at 2:00 PM IST (14:00) for Articles
-  cron.schedule('0 14 * * *', async () => {
+  cron.schedule('0 14-23 * * *', async () => {
     console.log('⏰ Daily ARTICLE generation cron triggered at', new Date().toISOString());
 
     try {
@@ -75,32 +75,50 @@ export function startCronJobs() {
   // ─── NEWS AUTOMATION (3 TIMES A DAY) ───
 
   // 1. Morning News (8:00 AM IST)
-  cron.schedule('0 8 * * *', async () => {
+  cron.schedule('0 8-12 * * *', async () => {
     console.log('⏰ Morning NEWS generation cron triggered at', new Date().toISOString());
     await generateSingleNewsJob('Morning');
   }, { timezone: 'Asia/Kolkata' });
 
   // 2. Afternoon News (1:00 PM IST)
-  cron.schedule('0 13 * * *', async () => {
+  cron.schedule('0 13-19 * * *', async () => {
     console.log('⏰ Afternoon NEWS generation cron triggered at', new Date().toISOString());
     await generateSingleNewsJob('Afternoon');
   }, { timezone: 'Asia/Kolkata' });
 
   // 3. Night News (8:00 PM IST)
-  cron.schedule('0 20 * * *', async () => {
+  cron.schedule('0 20-23 * * *', async () => {
     console.log('⏰ Night NEWS generation cron triggered at', new Date().toISOString());
     await generateSingleNewsJob('Night');
   }, { timezone: 'Asia/Kolkata' });
 
   console.log('✅ Cron jobs scheduled:');
-  console.log('   - Blog: Daily at 9:00 AM');
-  console.log('   - Article: Daily at 2:00 PM');
-  console.log('   - News: Daily at 8:00 AM, 1:00 PM, 8:00 PM');
+  console.log('   - Blog: Every hour from 9:00 AM to 11:00 PM (Retries)');
+  console.log('   - Article: Every hour from 2:00 PM to 11:00 PM (Retries)');
+  console.log('   - News: 8AM, 1PM, 8PM with hourly retries');
 }
 
 // Helper function to generate exactly 1 news item per slot
 async function generateSingleNewsJob(timeSlot: string) {
   try {
+    // Enforce exactly required news per day to prevent duplicate retries
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const newsCountToday = await News.countDocuments({ publishedAt: { $gte: startOfDay } });
+
+    if (timeSlot === 'Morning' && newsCountToday >= 1) {
+      console.log('⚠️ Morning News already generated today. Skipping.');
+      return;
+    }
+    if (timeSlot === 'Afternoon' && newsCountToday >= 2) {
+      console.log('⚠️ Afternoon News already generated today. Skipping.');
+      return;
+    }
+    if (timeSlot === 'Night' && newsCountToday >= 3) {
+      console.log('⚠️ Night News already generated today. Skipping.');
+      return;
+    }
+
     const newsData = await generateNews();
     const existing = await News.findOne({ slug: newsData.slug });
     
