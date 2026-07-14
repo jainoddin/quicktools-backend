@@ -218,4 +218,52 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
   }
 });
 
+// POST /api/tools/deduct-credits
+// General endpoint to deduct credits for client-side processed tools (like Background Remover)
+router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    const { toolSlug, toolName, creditsNeeded, prompt, result } = req.body;
+    const userId = (req.user as any).id;
+    const credits = creditsNeeded || 5;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.plan === 'free' && user.credits < credits) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not enough credits. Please upgrade to use this tool.',
+        errorType: 'INSUFFICIENT_CREDITS'
+      });
+    }
+
+    if (user.plan === 'free') {
+      user.credits -= credits;
+      await user.save();
+    }
+
+    await ToolUsage.create({
+      userId: user._id,
+      toolSlug: toolSlug || '/tools',
+      toolName: toolName || 'Tool',
+      prompt: prompt || 'Client-side image processing',
+      result: result || 'Processed successfully',
+      creditsUsed: user.plan === 'free' ? credits : 0,
+    });
+
+    res.json({
+      success: true,
+      message: 'Credits deducted successfully',
+      creditsRemaining: user.plan === 'free' ? user.credits : 'Unlimited'
+    });
+  } catch (error) {
+    console.error('❌ Credit deduction failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Credit deduction failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 export default router;
