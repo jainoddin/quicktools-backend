@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { generateToolText } from '../services/gemini.service';
+import { generateToolText, generateToolCode } from '../services/gemini.service';
 import { verifyAuth } from '../middlewares/auth.middleware';
 import { User } from '../models/user.model';
 import { ToolUsage } from '../models/toolUsage.model';
@@ -261,6 +261,73 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
     res.status(500).json({
       success: false,
       message: 'Credit deduction failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /api/tools/generate-code
+router.post('/generate-code', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    const { prompt, language, framework, codeType } = req.body;
+    const userId = (req.user as any).id;
+
+    if (!prompt) {
+      return res.status(400).json({ success: false, message: 'Prompt is required' });
+    }
+    if (prompt.length > 2000) {
+      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
+    }
+
+    // 1. Check user credits
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const creditsNeeded = 2; // Code generator uses 2 credits
+
+    if (user.plan === 'free' && user.credits < creditsNeeded) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not enough credits. Please upgrade to Premium.' 
+      });
+    }
+
+    // 2. Generate code
+    const generatedCode = await generateToolCode({
+      prompt,
+      language: language || 'JavaScript',
+      framework: framework || 'React',
+      codeType: codeType || 'Frontend (Web)'
+    });
+
+    // 3. Deduct credits and track usage
+    if (user.plan === 'free') {
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    await ToolUsage.create({
+      userId: user._id,
+      toolSlug: '/tools/ai-code-generator',
+      toolName: 'AI Code Generator',
+      prompt: prompt.substring(0, 500),
+      result: JSON.stringify({
+        html: generatedCode.html.substring(0, 100),
+        explanation: generatedCode.explanation
+      }),
+      creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+    });
+
+    res.json({
+      success: true,
+      data: generatedCode,
+      creditsRemaining: user.plan === 'free' ? user.credits : 'Unlimited'
+    });
+  } catch (error) {
+    console.error('❌ Code generation failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Code generation failed',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
