@@ -7,6 +7,9 @@ export interface IUser extends Document {
   avatar: string;
   role: string;
   savedTools: string[];
+  savedBlogs: string[];
+  savedArticles: string[];
+  savedNews: string[];
   favoriteImages: any[];
   credits: number;
   plan: string;
@@ -22,6 +25,9 @@ const UserSchema: Schema = new Schema(
     avatar: { type: String, required: true },
     role: { type: String, default: 'user', enum: ['user', 'admin'] },
     savedTools: { type: [String], default: [] },
+    savedBlogs: { type: [String], default: [] },
+    savedArticles: { type: [String], default: [] },
+    savedNews: { type: [String], default: [] },
     favoriteImages: { type: [Object], default: [] },
     credits: { type: Number, default: 15 },
     plan: { type: String, default: 'free', enum: ['free', 'starter', 'pro', 'business'] },

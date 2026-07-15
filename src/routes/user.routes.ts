@@ -141,6 +141,98 @@ router.get('/favorites', authenticate, async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+// POST /api/user/saved-blogs/:blogId
+router.post('/saved-blogs/:blogId', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const blogId = req.params.blogId;
+    
+    if (!user.savedBlogs) {
+      user.savedBlogs = [];
+    }
+    
+    const index = user.savedBlogs.indexOf(blogId);
+    let isSaved = false;
+    
+    if (index > -1) {
+      // Remove it
+      user.savedBlogs.splice(index, 1);
+      isSaved = false;
+    } else {
+      // Add it
+      user.savedBlogs.push(blogId);
+      isSaved = true;
+    }
+    
+    await user.save();
+    res.json({ success: true, isSaved, savedBlogs: user.savedBlogs });
+  } catch (error) {
+    console.error('Error toggling saved blog:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/user/saved-articles/:articleId
+router.post('/saved-articles/:articleId', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const articleId = req.params.articleId;
+    
+    if (!user.savedArticles) {
+      user.savedArticles = [];
+    }
+    
+    const index = user.savedArticles.indexOf(articleId);
+    let isSaved = false;
+    
+    if (index > -1) {
+      // Remove it
+      user.savedArticles.splice(index, 1);
+      isSaved = false;
+    } else {
+      // Add it
+      user.savedArticles.push(articleId);
+      isSaved = true;
+    }
+    
+    await user.save();
+    res.json({ success: true, isSaved, savedArticles: user.savedArticles });
+  } catch (error) {
+    console.error('Error toggling saved article:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/user/saved-news/:newsId
+router.post('/saved-news/:newsId', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const newsId = req.params.newsId;
+    
+    if (!user.savedNews) {
+      user.savedNews = [];
+    }
+    
+    const index = user.savedNews.indexOf(newsId);
+    let isSaved = false;
+    
+    if (index > -1) {
+      // Remove it
+      user.savedNews.splice(index, 1);
+      isSaved = false;
+    } else {
+      // Add it
+      user.savedNews.push(newsId);
+      isSaved = true;
+    }
+    
+    await user.save();
+    res.json({ success: true, isSaved, savedNews: user.savedNews });
+  } catch (error) {
+    console.error('Error toggling saved news:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // POST /api/user/favorites
 router.post('/favorites', authenticate, async (req: Request, res: Response) => {
