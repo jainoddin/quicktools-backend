@@ -176,7 +176,7 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
         
         if (user) {
           const creditsNeeded = 5;
-          if (user.plan === 'free' && user.credits < creditsNeeded) {
+          if (user.credits < creditsNeeded) {
             return res.status(403).json({ 
               success: false, 
               message: 'Not enough credits. Please upgrade to generate more images.',
@@ -184,17 +184,15 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
             });
           }
           // Deduct credits
-          if (user.plan === 'free') {
-            user.credits -= creditsNeeded;
-            await user.save();
-          }
+          user.credits -= creditsNeeded;
+          await user.save();
           await ToolUsage.create({
             userId: user._id,
             toolSlug: '/tools/ai-image-generator',
             toolName: 'AI Image Generator',
             prompt: prompt.substring(0, 500),
             result: imageUrl,
-            creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+            creditsUsed: creditsNeeded,
           });
         }
       } catch (authErr) {
@@ -258,13 +256,13 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
       toolName: toolName || 'Tool',
       prompt: prompt || 'Client-side image processing',
       result: result || 'Processed successfully',
-      creditsUsed: user.plan === 'free' ? credits : 0,
+      creditsUsed: credits,
     });
 
     res.json({
       success: true,
       message: 'Credits deducted successfully',
-      creditsRemaining: user.plan === 'free' ? user.credits : 'Unlimited'
+      creditsRemaining: user.credits
     });
   } catch (error) {
     console.error('❌ Credit deduction failed:', error);
@@ -304,7 +302,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
     // 1. Check user credits if authenticated
     if (userId) {
       user = await User.findById(userId);
-      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
+      if (user && user.credits < creditsNeeded) {
         return res.status(403).json({ 
           success: false, 
           message: 'Not enough credits. Please upgrade to Premium.' 
@@ -334,14 +332,14 @@ router.post('/generate-code', async (req: Request, res: Response) => {
           html: generatedCode.html ? generatedCode.html.substring(0, 100) : '',
           explanation: generatedCode.explanation
         }),
-        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+        creditsUsed: creditsNeeded,
       });
     }
 
     res.json({
       success: true,
       data: generatedCode,
-      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
+      creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
     console.error('❌ Code generation failed:', error);
@@ -428,14 +426,14 @@ router.post('/generate-video', async (req: Request, res: Response) => {
         toolName: 'AI Video Generator',
         prompt: prompt.substring(0, 500),
         result: JSON.stringify(resultData),
-        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+        creditsUsed: creditsNeeded,
       });
     }
 
     res.json({
       success: true,
       data: resultData,
-      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
+      creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
     console.error('❌ Video generation failed:', error);
