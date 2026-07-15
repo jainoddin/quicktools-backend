@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Article } from '../models/Article';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { runWithFailover } from './geminiClient';
 
 const ARTICLE_KEYWORDS = [
   { keyword: "Best AI Resume Builders", category: "AI & Tools" },
@@ -49,18 +47,11 @@ export async function generateArticle(): Promise<any> {
   const shuffledRelated = relatedArticles.sort(() => 0.5 - Math.random()).slice(0, 4);
   const relatedSlugs = shuffledRelated.map(a => a.slug);
 
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.7, 
-      maxOutputTokens: 8192,
-      responseMimeType: 'application/json'
-    }
-  });
+
 
   const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for QuickTools.ai — a premium platform for AI tools.
 
-Write a massive, comprehensive, engaging, and high-quality in-depth ARTICLE around this keyword:
+Write a concise, engaging, and high-quality ARTICLE around this keyword:
 Primary Keyword: ${keyword}
 
 This article MUST strictly follow ALL of these rules:
@@ -68,21 +59,22 @@ This article MUST strictly follow ALL of these rules:
 CONTENT REQUIREMENTS:
 1. Strong SEO Title (50–60 characters) — keyword at the start.
 2. Meta Description (140–160 characters) — make it compelling and click-worthy.
-3. Length: 2500–3500 words of detailed, rich content.
+3. Length: 800–1200 words maximum. Be concise, punchy, and avoid unnecessary filler.
 4. One H1 only (your title). Do NOT repeat it in the content body.
-5. Strong Introduction (H2): State the problem, the solution, and what readers will learn. 300–400 words.
-6. "What You'll Learn" — a bullet list of 5–8 key takeaways immediately after the intro.
-7. 8–12 H2 sections with H3 subsections for depth.
+5. Strong Introduction (H2): State the problem, the solution, and what readers will learn. 100–150 words maximum.
+6. "What You'll Learn" — a bullet list of 3–4 key takeaways immediately after the intro.
+7. 3–4 H2 sections maximum, keeping paragraphs short (2-3 sentences each).
 8. Include practical examples, real use cases, and actionable tips throughout.
-9. Include a dedicated "Top Tips" section with 5–7 numbered tips.
+9. Include a dedicated "Top Tips" section with 3 short numbered tips.
 10. Comparison Table (Tool, Pricing, Best For, Rating out of 5).
 11. Pros & Cons for the main tools/approaches discussed.
-12. 8–10 FAQs at the end (before Conclusion).
+12. 3 FAQs maximum at the end (before Conclusion).
 13. Strong Conclusion: Summary + final recommendation + call to action.
 14. Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone.
 15. Keyword density 1–2%. No stuffing.
 16. E-E-A-T signals: Mention why QuickTools.ai recommends these tools, real limitations, and who this is best for.
 17. Naturally mention QuickTools.ai 2–3 times as the go-to AI tools platform.
+
 
 INTERNAL LINKS (very important for SEO):
 Suggest 5–8 internal link anchor texts + their QuickTools.ai paths. Use realistic paths like:
@@ -97,13 +89,18 @@ EXTERNAL LINKS:
 Suggest 3–5 authoritative external links. Use ONLY official sites like openai.com, anthropic.com, ai.google, github.com/features/copilot.
 Include as a separate JSON field called "externalLinks".
 
-Return STRICTLY a raw JSON object (no markdown, no backticks, no comments):
+STRICT JSON RULES:
+- Return ONLY a valid JSON object.
+- CRUCIAL: You MUST escape all double quotes inside the string values properly (e.g. use \\\" instead of raw double quotes).
+- Do not include any comments or trailing commas.
+
+Return STRICTLY a JSON object matching this EXACT structure:
 {
   "title": "SEO Title (50-60 chars, keyword first)",
   "metaTitle": "Same as title",
   "metaDescription": "Compelling 140-160 char meta description",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
-  "readTime": "14 min read",
+  "readTime": "10 min read",
   "whatYoullLearn": [
     "Key takeaway 1",
     "Key takeaway 2",
@@ -142,12 +139,40 @@ Return STRICTLY a raw JSON object (no markdown, no backticks, no comments):
 }`;
 
 
+  let jsonString: string | undefined = undefined;
   try {
-    const result = await model.generateContent(prompt);
-    let rawText = result.response.text();
+    let rawText = await runWithFailover(async (genAI: any) => {
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-3-flash-preview',
+        generationConfig: {
+          temperature: 0.3, 
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json'
+        }
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
     
-    // Parse the JSON directly, the model will ensure it is valid
-    const parsedContent = JSON.parse(rawText);
+    // Extract JSON block using regex to bypass backticks or external conversational wrappers
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('--- GEMINI RAW RESPONSE FAILED TO MATCH JSON ---');
+      console.error(rawText);
+      throw new Error('No valid JSON found in Gemini response');
+    }
+
+    jsonString = jsonMatch[0];
+
+    // Escape literal control characters inside JSON string values to prevent JSON parse errors
+    jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
+      return match
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+    });
+
+    const parsedContent = JSON.parse(jsonString);
 
     // Ensure the table of contents has active states
     const toc = parsedContent.tableOfContents.map((item: any, index: number) => ({
@@ -191,6 +216,14 @@ Return STRICTLY a raw JSON object (no markdown, no backticks, no comments):
 
   } catch (error) {
     console.error("AI Article Generation Error:", error);
+    try {
+      if (typeof jsonString !== 'undefined') {
+        require('fs').writeFileSync('debug_json.json', jsonString);
+        console.log('Saved debug_json.json for troubleshooting.');
+      }
+    } catch (e) {
+      console.error('Failed to save debug JSON:', e);
+    }
     throw error;
   }
 }

@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { runWithFailover } from './geminiClient';
 import { Blog } from '../models/Blog';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const SEO_KEYWORDS = [
   { keyword: "Best AI Tools", category: "AI & Tools" },
@@ -66,15 +64,6 @@ export async function generateBlog(): Promise<any> {
   const shuffledRelated = relatedBlogs.sort(() => 0.5 - Math.random()).slice(0, 3);
   const relatedSlugs = shuffledRelated.map(b => b.slug);
 
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.7, 
-      maxOutputTokens: 8192,
-      responseMimeType: 'application/json'
-    }
-  });
-
   const prompt = `You are a Senior SEO Content Strategist and AI Journalist writing for QuickTools.ai — a premium platform for AI tools.
 
 Write a comprehensive, engaging, and high-quality blog around this keyword:
@@ -121,8 +110,18 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
 
   let text = "";
   try {
-    const result = await model.generateContent(prompt);
-    text = result.response.text();
+    text = await runWithFailover(async (genAI) => {
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-3-flash-preview',
+        generationConfig: {
+          temperature: 0.7, 
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json'
+        }
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    });
   } catch (error) {
     console.error("❌ Failed to generate content from Gemini:", error);
     throw error;
@@ -178,12 +177,6 @@ export async function generateToolText(params: {
   language: string;
   creativity: number;
 }): Promise<string> {
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: params.creativity / 10,
-    }
-  });
 
   const systemPrompt = `You are an expert AI Writer and Content Creator.
 Your task is to write high-quality, engaging content based on the user's requirements.
@@ -200,8 +193,16 @@ Do NOT include any extra conversational text (e.g., "Here is your blog post:"). 
 
   console.log(`🤖 Generating ${params.contentType} for prompt: "${params.prompt.substring(0, 50)}..."`);
 
-  const result = await model.generateContent(finalPrompt);
-  return result.response.text();
+  return await runWithFailover(async (genAI) => {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-3-flash-preview',
+      generationConfig: {
+        temperature: params.creativity / 10,
+      }
+    });
+    const result = await model.generateContent(finalPrompt);
+    return result.response.text();
+  });
 }
 
 export async function generateToolCode(params: {
@@ -210,13 +211,6 @@ export async function generateToolCode(params: {
   framework: string;
   codeType: string;
 }): Promise<{ html: string; css: string; js: string; explanation: string[] }> {
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.3,
-      responseMimeType: "application/json"
-    }
-  });
 
   const systemPrompt = `You are a Senior Full-Stack Developer and Expert AI Code Generator.
 Generate a complete, high-quality, and working code implementation based on the user request.
@@ -249,8 +243,17 @@ If the user requests a backend or script-based language (like Python, SQL, C++, 
   const finalPrompt = `${systemPrompt}\n\nUser Request:\n${params.prompt}`;
   console.log(`🤖 Generating code using Gemini for: "${params.prompt.substring(0, 50)}..."`);
 
-  const result = await model.generateContent(finalPrompt);
-  const text = result.response.text();
+  const text = await runWithFailover(async (genAI) => {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-3-flash-preview',
+      generationConfig: {
+        temperature: 0.3,
+        responseMimeType: "application/json"
+      }
+    });
+    const result = await model.generateContent(finalPrompt);
+    return result.response.text();
+  });
   
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {

@@ -73,7 +73,8 @@ router.get('/usage', authenticate, async (req: Request, res: Response) => {
     const creditsUsedThisPeriod = usageAgg.length > 0 ? usageAgg[0].totalCreditsUsed : 0;
     
     // We can define total credits per plan
-    const maxCredits = user.plan === 'business' ? 100000 : user.plan === 'pro' ? 10000 : user.plan === 'starter' ? 500 : 15;
+    const baseMax = user.plan === 'business' ? 100000 : user.plan === 'pro' ? 10000 : user.plan === 'starter' ? 500 : 15;
+    const maxCredits = Math.max(baseMax, user.credits + creditsUsedThisPeriod);
 
     res.json({
       success: true,

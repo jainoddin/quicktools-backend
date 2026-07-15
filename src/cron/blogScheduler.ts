@@ -2,13 +2,85 @@ import cron from 'node-cron';
 import { Blog } from '../models/Blog';
 import { Article } from '../models/Article';
 import { News } from '../models/News';
+import { CronFailure } from '../models/CronFailure';
 import { generateBlog } from '../services/gemini.service';
 import { generateArticle } from '../services/articleGenerator';
 import { generateNews } from '../services/newsGenerator';
+import { sendAdminNotificationEmail } from '../services/emailService';
 
-// Runs every day at 9:00 AM IST
+// Helper to get current date string in Asia/Kolkata timezone (YYYY-MM-DD)
+const getKolkataDateString = () => {
+  const d = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(d);
+};
+
+// Helper function to handle cron failure logs and single email alerts per day
+async function handleCronFailure(type: string, error: any) {
+  try {
+    const dateStr = getKolkataDateString();
+
+    // Check if we already registered a failure and emailed for this type on this date
+    const existing = await CronFailure.findOne({ type, date: dateStr });
+
+    if (existing && existing.emailed) {
+      console.log(`[handleCronFailure] Failure email already sent today for ${type}. Skipping email alert.`);
+      return;
+    }
+
+    // If it doesn't exist, create it. If it exists but wasn't emailed yet, update and email.
+    let doc = existing;
+    if (!doc) {
+      doc = new CronFailure({
+        type,
+        date: dateStr,
+        error: error instanceof Error ? error.stack || error.message : String(error),
+        emailed: false
+      });
+    } else {
+      doc.error = error instanceof Error ? error.stack || error.message : String(error);
+    }
+
+    const subject = `🚨 QuickTools AI: ${type.toUpperCase().replace('_', ' ')} Generation Failed!`;
+    const contentHTML = `
+      <div style="font-family: Arial, sans-serif; max-w: 600px; margin: 0 auto; padding: 20px; border: 1px solid #FECACA; border-radius: 10px; background-color: #FEF2F2;">
+        <h2 style="color: #DC2626; text-align: center; margin-top: 0;">Cron Job Failure Alert</h2>
+        <p style="color: #374151; font-size: 16px; line-height: 1.5;">
+          The automated cron job for <strong>${type}</strong> failed to execute today (${dateStr} Asia/Kolkata).
+        </p>
+        <div style="background-color: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 5px; padding: 15px; overflow-x: auto; font-family: monospace; font-size: 13px; color: #7F1D1D; margin: 20px 0;">
+          <strong>Error Message:</strong><br/>
+          <pre style="margin-top: 10px; white-space: pre-wrap; word-break: break-all;">${error instanceof Error ? error.stack || error.message : String(error)}</pre>
+        </div>
+        <p style="color: #374151; font-size: 14px;">
+          The system will continue retrying every 5 minutes during the scheduled slot. It will stop retrying once it successfully posts the content.
+        </p>
+        <hr style="border: none; border-top: 1px solid #FECACA; margin: 20px 0;" />
+        <p style="color: #9CA3AF; font-size: 11px; text-align: center;">
+          © QuickTools.ai automated notification system.
+        </p>
+      </div>
+    `;
+
+    const emailSent = await sendAdminNotificationEmail(subject, contentHTML);
+    if (emailSent) {
+      doc.emailed = true;
+    }
+    await doc.save();
+    console.log(`[handleCronFailure] Logged failure for ${type} on ${dateStr}. Emailed status: ${doc.emailed}`);
+  } catch (err) {
+    console.error('Error handling cron failure email:', err);
+  }
+}
+
 export function startCronJobs() {
-  cron.schedule('0 9-23 * * *', async () => {
+  // 1. Blog: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 9 AM and 11 PM IST
+  cron.schedule('2-59/5 9-23 * * *', async () => {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
     try {
@@ -35,13 +107,14 @@ export function startCronJobs() {
       console.log(`✅ Auto-generated blog: "${blog.title}"`);
     } catch (error) {
       console.error('❌ Cron blog generation failed:', error);
+      await handleCronFailure('blog', error);
     }
   }, {
     timezone: 'Asia/Kolkata',
   });
 
-  // Runs every day at 2:00 PM IST (14:00) for Articles
-  cron.schedule('0 14-23 * * *', async () => {
+  // 2. Article: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 2 PM and 11 PM IST
+  cron.schedule('2-59/5 14-23 * * *', async () => {
     console.log('⏰ Daily ARTICLE generation cron triggered at', new Date().toISOString());
 
     try {
@@ -67,6 +140,7 @@ export function startCronJobs() {
       console.log(`✅ Auto-generated article: "${article.title}"`);
     } catch (error) {
       console.error('❌ Cron article generation failed:', error);
+      await handleCronFailure('article', error);
     }
   }, {
     timezone: 'Asia/Kolkata',
@@ -74,32 +148,32 @@ export function startCronJobs() {
 
   // ─── NEWS AUTOMATION (3 TIMES A DAY) ───
 
-  // 1. Morning News (8:00 AM IST)
-  cron.schedule('0 8-12 * * *', async () => {
+  // Morning News (8:02 AM IST first try, retry every 5 mins in 8:00 AM - 12:59 PM slot)
+  cron.schedule('2-59/5 8-12 * * *', async () => {
     console.log('⏰ Morning NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Morning');
+    await generateSingleNewsJob('Morning', 'news_morning');
   }, { timezone: 'Asia/Kolkata' });
 
-  // 2. Afternoon News (1:00 PM IST)
-  cron.schedule('0 13-19 * * *', async () => {
+  // Afternoon News (1:02 PM IST first try, retry every 5 mins in 1:00 PM - 7:59 PM slot)
+  cron.schedule('2-59/5 13-19 * * *', async () => {
     console.log('⏰ Afternoon NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Afternoon');
+    await generateSingleNewsJob('Afternoon', 'news_afternoon');
   }, { timezone: 'Asia/Kolkata' });
 
-  // 3. Night News (8:00 PM IST)
-  cron.schedule('0 20-23 * * *', async () => {
+  // Night News (8:02 PM IST first try, retry every 5 mins in 8:00 PM - 11:59 PM slot)
+  cron.schedule('2-59/5 20-23 * * *', async () => {
     console.log('⏰ Night NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Night');
+    await generateSingleNewsJob('Night', 'news_night');
   }, { timezone: 'Asia/Kolkata' });
 
-  console.log('✅ Cron jobs scheduled:');
-  console.log('   - Blog: Every hour from 9:00 AM to 11:00 PM (Retries)');
-  console.log('   - Article: Every hour from 2:00 PM to 11:00 PM (Retries)');
-  console.log('   - News: 8AM, 1PM, 8PM with hourly retries');
+  console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
+  console.log('   - Blog: Every 5 mins starting from 9:02 AM to 11:59 PM');
+  console.log('   - Article: Every 5 mins starting from 2:02 PM to 11:59 PM');
+  console.log('   - News: Slots at 8AM, 1PM, 8PM with 5-min retry windows');
 }
 
 // Helper function to generate exactly 1 news item per slot
-async function generateSingleNewsJob(timeSlot: string) {
+async function generateSingleNewsJob(timeSlot: string, failureType: string) {
   try {
     // Enforce exactly required news per day to prevent duplicate retries
     const startOfDay = new Date();
@@ -121,7 +195,7 @@ async function generateSingleNewsJob(timeSlot: string) {
 
     const newsData = await generateNews();
     const existing = await News.findOne({ slug: newsData.slug });
-    
+
     if (existing) {
       newsData.slug = `${newsData.slug}-${Date.now()}`;
     }
@@ -138,5 +212,7 @@ async function generateSingleNewsJob(timeSlot: string) {
     console.log(`✅ Auto-generated ${timeSlot} news: "${news.title}"`);
   } catch (error) {
     console.error(`❌ Cron ${timeSlot} news generation failed:`, error);
+    await handleCronFailure(failureType, error);
   }
 }
+

@@ -4,6 +4,7 @@ import { generateToolText, generateToolCode } from '../services/gemini.service';
 import { verifyAuth } from '../middlewares/auth.middleware';
 import { User } from '../models/user.model';
 import { ToolUsage } from '../models/toolUsage.model';
+import { sendAdminNotificationEmail } from '../services/emailService';
 import rateLimit from 'express-rate-limit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
@@ -292,21 +293,26 @@ router.post('/generate-code', async (req: Request, res: Response) => {
     if (!prompt) {
       return res.status(400).json({ success: false, message: 'Prompt is required' });
     }
-    if (prompt.length > 2000) {
-      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
+    if (prompt.length > 5000) {
+      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 5000 characters.' });
     }
 
     let user = null;
-    const creditsNeeded = 2; // Code generator uses 2 credits
+    const creditsNeeded = 50; // Code generator uses 50 credits
 
     // 1. Check user credits if authenticated
     if (userId) {
-      user = await User.findById(userId);
-      if (user && user.credits < creditsNeeded) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'Not enough credits. Please upgrade to Premium.' 
-        });
+      try {
+        user = await User.findById(userId).maxTimeMS(2000);
+        if (user && user.credits < creditsNeeded) {
+          return res.status(403).json({ 
+            success: false, 
+            message: 'Not enough credits. Please upgrade to Premium.' 
+          });
+        }
+      } catch (dbError) {
+        console.warn('⚠️ MongoDB error during credit check, bypassing:', dbError);
+        user = null; // Proceed as guest
       }
     }
 
@@ -320,20 +326,26 @@ router.post('/generate-code', async (req: Request, res: Response) => {
 
     // 3. Deduct credits and track usage for authenticated users
     if (user) {
-      user.credits -= creditsNeeded;
-      await user.save();
+      try {
+        user.credits -= creditsNeeded;
+        await user.save();
 
-      await ToolUsage.create({
-        userId: user._id,
-        toolSlug: '/tools/ai-code',
-        toolName: 'AI Code Generator',
-        prompt: prompt.substring(0, 500),
-        result: JSON.stringify({
-          html: generatedCode.html ? generatedCode.html.substring(0, 100) : '',
-          explanation: generatedCode.explanation
-        }),
-        creditsUsed: creditsNeeded,
-      });
+        await ToolUsage.create({
+          userId: user._id,
+          toolSlug: '/tools/ai-code',
+          toolName: 'AI Code Generator',
+          prompt: prompt.substring(0, 500),
+          result: JSON.stringify({
+            html: generatedCode.html || '',
+            css: generatedCode.css || '',
+            js: generatedCode.js || '',
+            explanation: generatedCode.explanation
+          }),
+          creditsUsed: creditsNeeded,
+        });
+      } catch (dbError) {
+        console.warn('⚠️ MongoDB error during credit deduction, bypassing:', dbError);
+      }
     }
 
     res.json({
@@ -442,6 +454,31 @@ router.post('/generate-video', async (req: Request, res: Response) => {
       message: 'Video generation failed',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+// POST /api/tools/report-error
+// Reports client-side tool errors to the backend, which notifies the team via email.
+router.post('/report-error', async (req: Request, res: Response) => {
+  try {
+    const { toolName, errorDetails, userEmail, prompt } = req.body;
+    
+    const subject = `[Error Report] Failure in ${toolName || 'Tool'}`;
+    const contentHTML = `
+      <h3>An error was reported by a user</h3>
+      <p><strong>Tool:</strong> ${toolName}</p>
+      <p><strong>User Email:</strong> ${userEmail || 'Guest'}</p>
+      <p><strong>Prompt/Input:</strong> ${prompt || 'N/A'}</p>
+      <p><strong>Error Details:</strong></p>
+      <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${JSON.stringify(errorDetails, null, 2)}</pre>
+    `;
+
+    await sendAdminNotificationEmail(subject, contentHTML);
+
+    res.json({ success: true, message: 'Error reported and team notified.' });
+  } catch (error) {
+    console.error('Failed to process error report:', error);
+    res.status(500).json({ success: false, message: 'Failed to process error report.' });
   }
 });
 
