@@ -81,7 +81,7 @@ router.post('/generate-text', async (req: Request, res: Response) => {
     }
 
     let user = null;
-    const creditsNeeded = 2; // AI Writer / Code uses 2 credits
+    const creditsNeeded = 10; // AI Writer uses 10 credits
 
     // 1. Check user credits if authenticated
     if (userId) {
@@ -352,6 +352,102 @@ router.post('/generate-code', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Code generation failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+
+router.post('/generate-video', async (req: Request, res: Response) => {
+  try {
+    const { prompt, videoType, style, duration, aspectRatio } = req.body;
+    
+    // Optional Auth
+    const token = req.cookies.token;
+    let userId = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        userId = decoded.id;
+      } catch (err) {}
+    }
+
+    if (!prompt) {
+      return res.status(400).json({ success: false, message: 'Prompt is required' });
+    }
+    if (prompt.length > 2000) {
+      return res.status(400).json({ success: false, message: 'Prompt too long. Maximum 2000 characters.' });
+    }
+
+    let user = null;
+    const creditsNeeded = 10; // AI Video generator uses 10 credits
+
+    // 1. Check user credits if authenticated
+    if (userId) {
+      user = await User.findById(userId);
+      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade to Premium.' 
+        });
+      }
+    }
+
+    let videoUrl = "https://www.w3schools.com/html/mov_bbb.mp4"; // Fallback video
+    let hdVideoUrl = "https://www.w3schools.com/html/mov_bbb.mp4"; // Fallback HD video
+    let thumbnailUrl = "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=600&auto=format&fit=crop"; // Fallback thumbnail
+
+    try {
+      const pixabayKey = '56697833-4e57c050209137ee8fb8ad3ad';
+      const searchTerms = encodeURIComponent(prompt.substring(0, 100));
+      const response = await fetch(`https://pixabay.com/api/videos/?key=${pixabayKey}&q=${searchTerms}&video_type=film&per_page=3`);
+      const data: any = await response.json();
+      
+      if (data && data.hits && data.hits.length > 0) {
+        const hit: any = data.hits[0];
+        const videos: any = hit.videos;
+        videoUrl = (videos.tiny || videos.small || videos.medium || videos.large).url;
+        hdVideoUrl = (videos.large || videos.medium || videos.small).url;
+        thumbnailUrl = `https://i.vimeocdn.com/video/${hit.picture_id}_960x540.jpg`;
+      }
+    } catch (e) {
+      console.error("Pixabay fetch error:", e);
+    }
+    
+    const resultData = {
+      videoUrl: videoUrl,
+      hdVideoUrl: hdVideoUrl,
+      thumbnailUrl: thumbnailUrl,
+      prompt: prompt
+    };
+
+    // 3. Deduct credits and track usage for authenticated users
+    if (user) {
+      if (user.plan === 'free') {
+        user.credits -= creditsNeeded;
+        await user.save();
+      }
+
+      await ToolUsage.create({
+        userId: user._id,
+        toolSlug: '/tools/ai-video-generator',
+        toolName: 'AI Video Generator',
+        prompt: prompt.substring(0, 500),
+        result: JSON.stringify(resultData),
+        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: resultData,
+      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
+    });
+  } catch (error) {
+    console.error('❌ Video generation failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Video generation failed',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

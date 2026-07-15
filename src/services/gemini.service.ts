@@ -70,6 +70,8 @@ export async function generateBlog(): Promise<any> {
     model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0.7, 
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json'
     }
   });
 
