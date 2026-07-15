@@ -86,7 +86,7 @@ router.post('/generate-text', async (req: Request, res: Response) => {
     // 1. Check user credits if authenticated
     if (userId) {
       user = await User.findById(userId);
-      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
+      if (user && user.credits < creditsNeeded) {
         return res.status(403).json({ 
           success: false, 
           message: 'Not enough credits. Please upgrade to Premium.' 
@@ -105,10 +105,8 @@ router.post('/generate-text', async (req: Request, res: Response) => {
 
     // 3. Deduct credits and track usage for authenticated users
     if (user) {
-      if (user.plan === 'free') {
-        user.credits -= creditsNeeded;
-        await user.save();
-      }
+      user.credits -= creditsNeeded;
+      await user.save();
 
       await ToolUsage.create({
         userId: user._id,
@@ -116,14 +114,14 @@ router.post('/generate-text', async (req: Request, res: Response) => {
         toolName: toolName || 'AI Writer',
         prompt: prompt.substring(0, 500),
         result: text,
-        creditsUsed: user.plan === 'free' ? creditsNeeded : 0,
+        creditsUsed: creditsNeeded,
       });
     }
 
     res.json({
       success: true,
       data: text,
-      creditsRemaining: user ? (user.plan === 'free' ? user.credits : 'Unlimited') : 'Guest'
+      creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
     console.error('❌ Text generation failed:', error);
@@ -324,10 +322,8 @@ router.post('/generate-code', async (req: Request, res: Response) => {
 
     // 3. Deduct credits and track usage for authenticated users
     if (user) {
-      if (user.plan === 'free') {
-        user.credits -= creditsNeeded;
-        await user.save();
-      }
+      user.credits -= creditsNeeded;
+      await user.save();
 
       await ToolUsage.create({
         userId: user._id,
@@ -423,10 +419,8 @@ router.post('/generate-video', async (req: Request, res: Response) => {
 
     // 3. Deduct credits and track usage for authenticated users
     if (user) {
-      if (user.plan === 'free') {
-        user.credits -= creditsNeeded;
-        await user.save();
-      }
+      user.credits -= creditsNeeded;
+      await user.save();
 
       await ToolUsage.create({
         userId: user._id,
