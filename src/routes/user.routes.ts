@@ -2,12 +2,9 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
 import { ToolUsage } from '../models/toolUsage.model';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { JWT_SECRET } from '../config/env';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
 
 // Helper middleware to authenticate
 const authenticate = async (req: Request, res: Response, next: any) => {

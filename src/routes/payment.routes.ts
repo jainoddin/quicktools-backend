@@ -4,8 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createRazorpayOrder, verifyPaymentSignature } from '../services/razorpay.service';
 import Payment from '../models/Payment.model';
 import { User } from '../models/user.model';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
+import { JWT_SECRET } from '../config/env';
 
 const router = Router();
 

@@ -18,22 +18,48 @@ import passport from 'passport';
 import helmet from 'helmet';
 import './services/auth.service'; // Register passport strategies
 import { startCronJobs } from './cron/blogScheduler';
+import rateLimit from 'express-rate-limit';
+import { FRONTEND_URL, PORT, isProd } from './config/env';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 // ─── Middleware ───────────────────────────────────────────
-app.use(helmet());
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
+app.set('trust proxy', 1);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+const allowedOrigins = new Set(
+  [
     'https://quicktools.ai',
     'https://quicktool.space',
-    process.env.FRONTEND_URL
-  ].filter(Boolean) as string[],
-  credentials: true,
-}));
+    FRONTEND_URL,
+    ...(isProd ? [] : ['http://localhost:3000', 'http://localhost:3001']),
+  ].filter(Boolean)
+);
+
+app.use(
+  cors({
+    origin(origin, cb) {
+      // allow non-browser clients (curl/postman) with no origin
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
@@ -46,7 +72,7 @@ app.get('/', (req, res) => {
 app.use('/api/blogs', blogRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/tools', toolsRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/articles', articleRoutes);

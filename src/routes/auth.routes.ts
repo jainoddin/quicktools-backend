@@ -2,14 +2,9 @@ import { Router, Request, Response } from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/user.model';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { FRONTEND_URL, JWT_SECRET } from '../config/env';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_development_only_please_change';
-// The frontend URL to redirect to after successful login
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3001';
 
 // Helper function to generate JWT
 const generateToken = (user: IUser) => {
