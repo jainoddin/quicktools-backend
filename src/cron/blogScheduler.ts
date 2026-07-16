@@ -113,9 +113,9 @@ export function startCronJobs() {
     timezone: 'Asia/Kolkata',
   });
 
-  // 2. Article: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 2 PM and 11 PM IST
-  cron.schedule('2-59/5 14-23 * * *', async () => {
-    console.log('⏰ Daily ARTICLE generation cron triggered at', new Date().toISOString());
+  // 2. Article: Runs at minute 2 of every 5-minute interval between 9 PM and 11 PM IST (Night slot)
+  cron.schedule('2-59/5 21-23 * * *', async () => {
+    console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
     try {
       // Enforce exactly 1 article per day
@@ -167,9 +167,9 @@ export function startCronJobs() {
   }, { timezone: 'Asia/Kolkata' });
 
   console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
-  console.log('   - Blog: Every 5 mins starting from 9:02 AM to 11:59 PM');
-  console.log('   - Article: Every 5 mins starting from 2:02 PM to 11:59 PM');
-  console.log('   - News: Slots at 8AM, 1PM, 8PM with 5-min retry windows');
+  console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
+  console.log('   - News:    Morning 8 AM | Afternoon 1 PM | Night 8 PM');
+  console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
 }
 
 // Helper function to generate exactly 1 news item per slot
