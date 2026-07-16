@@ -32,6 +32,7 @@ Health: `http://localhost:5000/health`
 | `JWT_SECRET` | Strong random secret (app will not start without it) |
 | `FRONTEND_URL` | Exact frontend origin (CORS + OAuth redirects) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` | OAuth |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_CALLBACK_URL` | GitHub OAuth |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Payments |
 | `GEMINI_API_KEYS` | Comma-separated keys |
 | `CRON_SECRET` | Protects cron trigger routes |

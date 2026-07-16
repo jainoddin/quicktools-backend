@@ -15,6 +15,32 @@ const generateToken = (user: IUser) => {
   );
 };
 
+const setAuthCookiesAndRedirect = (res: Response, user: IUser) => {
+  const token = generateToken(user);
+
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  const userData = JSON.stringify({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+  });
+  res.cookie('user_data', encodeURIComponent(userData), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  res.redirect(`${FRONTEND_URL}/dashboard`);
+};
+
 // ==========================================
 // 1. Initiate Google OAuth Flow
 // ==========================================
@@ -33,36 +59,29 @@ router.get(
   '/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL}/login?error=auth_failed` }),
   (req: Request, res: Response) => {
-    // If authentication is successful, req.user will be populated
-    const user = req.user as IUser;
+    setAuthCookiesAndRedirect(res, req.user as IUser);
+  }
+);
 
-    // Generate JWT
-    const token = generateToken(user);
+// ==========================================
+// 2b. GitHub OAuth
+// ==========================================
+router.get(
+  '/github',
+  passport.authenticate('github', {
+    scope: ['user:email'],
+    session: false,
+  })
+);
 
-    // Set JWT in an httpOnly secure cookie
-    res.cookie('token', token, {
-      httpOnly: true, // Prevents client-side JS from reading the cookie
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies (HTTPS only) in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site cookies in prod if needed, 'lax' for local dev
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-    });
-
-    // Set non-httpOnly cookie for optimistic UI rendering on the frontend
-    const userData = JSON.stringify({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar
-    });
-    res.cookie('user_data', encodeURIComponent(userData), {
-      httpOnly: false, // Must be accessible via JS document.cookie
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    // Redirect user to the frontend dashboard page
-    res.redirect(`${FRONTEND_URL}/dashboard`);
+router.get(
+  '/github/callback',
+  passport.authenticate('github', {
+    session: false,
+    failureRedirect: `${FRONTEND_URL}/login?error=auth_failed`,
+  }),
+  (req: Request, res: Response) => {
+    setAuthCookiesAndRedirect(res, req.user as IUser);
   }
 );
 

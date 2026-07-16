@@ -1,7 +1,8 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
-  googleId: string;
+  googleId?: string | null;
+  githubId?: string | null;
   email: string;
   name: string;
   avatar: string;
@@ -23,7 +24,9 @@ export interface IUser extends Document {
 
 const UserSchema: Schema = new Schema(
   {
-    googleId: { type: String, required: true, unique: true },
+    // sparse: allow Google-only or GitHub-only accounts (null/missing ok)
+    googleId: { type: String, unique: true, sparse: true },
+    githubId: { type: String, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     avatar: { type: String, required: true },
