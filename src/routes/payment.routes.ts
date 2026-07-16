@@ -217,4 +217,29 @@ router.post('/cancel-plan', async (req: Request, res: Response) => {
   }
 });
 
+// ──────────────────────────────────────────────
+// GET /api/payment/invoices
+// User invoices history fetch
+// ──────────────────────────────────────────────
+router.get('/invoices', async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies?.token;
+    if (!token) {
+      res.status(401).json({ success: false, error: 'Not authenticated' });
+      return;
+    }
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    // Sort by descending createdAt (newest first)
+    const invoices = await Payment.find({ userId: decoded.id })
+      .sort({ createdAt: -1 })
+      .select('razorpayOrderId amount status plan createdAt');
+
+    res.json({ success: true, invoices });
+  } catch (err: any) {
+    console.error('❌ Fetch invoices error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch invoices' });
+  }
+});
+
 export default router;

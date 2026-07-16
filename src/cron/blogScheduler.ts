@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { Blog } from '../models/Blog';
 import { Article } from '../models/Article';
 import { News } from '../models/News';
+import { User } from '../models/user.model';
 import { CronFailure } from '../models/CronFailure';
 import { generateBlog } from '../services/gemini.service';
 import { generateArticle } from '../services/articleGenerator';
@@ -166,10 +167,26 @@ export function startCronJobs() {
     await generateSingleNewsJob('Night', 'news_night');
   }, { timezone: 'Asia/Kolkata' });
 
+  // Purge accounts deactivated for more than 15 days (daily at 3:00 AM IST)
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+      const result = await User.deleteMany({
+        deactivatedAt: { $ne: null, $lte: cutoff },
+      });
+      if (result.deletedCount > 0) {
+        console.log(`🗑️ Permanently deleted ${result.deletedCount} deactivated account(s) past 15-day grace period`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to purge deactivated accounts:', error);
+    }
+  }, { timezone: 'Asia/Kolkata' });
+
   console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
   console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
+  console.log('   - Accounts: Purge deactivated (15+ days) — 3:00 AM daily');
 }
 
 // Helper function to generate exactly 1 news item per slot

@@ -13,6 +13,10 @@ export interface IUser extends Document {
   favoriteImages: any[];
   credits: number;
   plan: string;
+  bio?: string;
+  customAvatar?: boolean;
+  /** When set, account is deactivated. Login within 15 days reactivates; after 15 days it is permanently deleted. */
+  deactivatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +35,9 @@ const UserSchema: Schema = new Schema(
     favoriteImages: { type: [Object], default: [] },
     credits: { type: Number, default: 15 },
     plan: { type: String, default: 'free', enum: ['free', 'starter', 'pro', 'business'] },
+    bio: { type: String, default: '' },
+    customAvatar: { type: Boolean, default: false },
+    deactivatedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

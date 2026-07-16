@@ -94,6 +94,25 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ authenticated: false, message: 'User not found' });
     }
 
+    // Block deactivated accounts until they re-login (which reactivates within 15 days)
+    if (user.deactivatedAt) {
+      res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      });
+      res.clearCookie('user_data', {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      });
+      return res.status(401).json({
+        authenticated: false,
+        message: 'Account deactivated. Log in again within 15 days to reactivate.',
+        deactivated: true,
+      });
+    }
+
     res.json({
       authenticated: true,
       user: {
@@ -102,6 +121,7 @@ router.get('/me', async (req: Request, res: Response) => {
         email: user.email,
         avatar: user.avatar,
         role: user.role,
+        bio: user.bio || '',
         savedTools: user.savedTools || [],
         savedBlogs: user.savedBlogs || [],
         savedArticles: user.savedArticles || [],
@@ -140,20 +160,60 @@ router.post('/logout', (req: Request, res: Response) => {
 router.put('/profile', async (req: Request, res: Response) => {
   try {
     const token = req.cookies.token;
-    if (!token) return res.status(401).json({ message: 'Not authenticated' });
+    if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const { name, bio } = req.body;
-    if (name) user.name = name;
-    if (bio !== undefined) (user as any).bio = bio;
+    const { name, bio, avatar } = req.body;
+    if (typeof name === 'string' && name.trim()) {
+      user.name = name.trim();
+    }
+    if (typeof bio === 'string') {
+      user.bio = bio.slice(0, 100);
+    }
+    if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+      // Cap ~1.5MB base64 payload
+      if (avatar.length > 2_000_000) {
+        return res.status(400).json({ success: false, message: 'Image too large. Please use a smaller photo.' });
+      }
+      user.avatar = avatar;
+      user.customAvatar = true;
+    }
     await user.save();
 
-    res.json({ success: true, user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar } });
+    // Keep optimistic UI cookie in sync
+    const userData = JSON.stringify({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      bio: user.bio || '',
+      plan: user.plan || 'free',
+    });
+    res.cookie('user_data', encodeURIComponent(userData), {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio || '',
+        plan: user.plan || 'free',
+        role: user.role,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Profile update error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -189,6 +249,52 @@ router.put('/tools/:slug/star', async (req: Request, res: Response) => {
     res.json({ success: true, savedTools: user.savedTools });
   } catch (error) {
     console.error('Error toggling star:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ==========================================
+// 7. Deactivate Account (15-day grace period)
+// ==========================================
+router.post('/deactivate-account', async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const { confirmation } = req.body;
+    if (confirmation !== 'DEACTIVATE' && confirmation !== 'DELETE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Please type DEACTIVATE to confirm',
+      });
+    }
+
+    user.deactivatedAt = new Date();
+    await user.save();
+
+    // Log the user out
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.clearCookie('user_data', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+
+    res.json({
+      success: true,
+      message:
+        'Account deactivated. Log in again within 15 days to reactivate. After 15 days your account will be permanently deleted.',
+    });
+  } catch (error) {
+    console.error('Error deactivating account:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
