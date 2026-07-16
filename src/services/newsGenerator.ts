@@ -1,7 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { News } from '../models/News';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { runWithFailover } from './geminiClient';
 
 const NEWS_TOPICS = [
   { topic: "OpenAI Launches GPT-4o Mini with Major Performance Boost", category: "Product Launches", tags: ["OpenAI", "GPT-4o Mini", "AI Models", "Product Launch"] },
@@ -50,15 +48,6 @@ export async function generateNews(topicOverride?: string): Promise<any> {
   const shuffledRelated = relatedNews.sort(() => 0.5 - Math.random()).slice(0, 4);
   const relatedSlugs = shuffledRelated.map(n => n.slug);
 
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.3, // Lower temperature for more factual, journalistic reporting
-      maxOutputTokens: 4096,
-      responseMimeType: 'application/json'
-    }
-  });
-
   const prompt = `You are a Professional Tech Journalist reporting for QuickTools.ai News.
 
 Write a factual, engaging, and professional News Article around this topic/event:
@@ -104,10 +93,29 @@ Return STRICTLY a raw JSON object matching this exact schema:
 }`;
 
   try {
-    console.log(`📰 Generating News for topic: "${topicToGenerate}"`);
-    const result = await model.generateContent(prompt);
-    const rawText = result.response.text();
-    const parsedContent = JSON.parse(rawText);
+    const parsedContent = await runWithFailover(async (genAIInstance) => {
+      const model = genAIInstance.getGenerativeModel({ 
+        model: 'gemini-3-flash-preview',
+        generationConfig: {
+          temperature: 0.3, // Lower temperature for more factual, journalistic reporting
+          maxOutputTokens: 4096,
+          responseMimeType: 'application/json'
+        }
+      });
+      console.log(`📰 Generating News for topic: "${topicToGenerate}"`);
+      const result = await model.generateContent(prompt);
+      let rawText = result.response.text().trim();
+      if (rawText.startsWith('```json')) {
+        rawText = rawText.substring(7);
+      } else if (rawText.startsWith('```')) {
+        rawText = rawText.substring(3);
+      }
+      if (rawText.endsWith('```')) {
+        rawText = rawText.substring(0, rawText.length - 3);
+      }
+      rawText = rawText.trim();
+      return JSON.parse(rawText);
+    });
 
     return {
       slug: generateSlug(parsedContent.title),
