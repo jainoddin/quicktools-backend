@@ -168,7 +168,7 @@ export function startCronJobs() {
 
   console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
-  console.log('   - News:    Morning 8 AM | Afternoon 1 PM | Night 8 PM');
+  console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
 }
 
