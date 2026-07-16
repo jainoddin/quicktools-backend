@@ -88,8 +88,18 @@ passport.use(
 // ─── GitHub ───────────────────────────────────────────────
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+// Production MUST use the public backend URL — never fall back to localhost on Render
 const GITHUB_CALLBACK_URL =
-  process.env.GITHUB_CALLBACK_URL || 'http://localhost:5000/api/auth/github/callback';
+  process.env.GITHUB_CALLBACK_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://quicktools-backend-wlm5.onrender.com/api/auth/github/callback'
+    : 'http://localhost:5000/api/auth/github/callback');
+
+if (!process.env.GITHUB_CALLBACK_URL && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '⚠️ GITHUB_CALLBACK_URL not set — using production default. Set it explicitly on Render.'
+  );
+}
 
 if (GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET) {
   passport.use(
