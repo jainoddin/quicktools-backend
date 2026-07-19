@@ -83,6 +83,24 @@ app.use('/api/contact', contactRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)
 
+// URL Shortener Redirect
+import { ShortUrl } from './models/ShortUrl';
+app.get('/s/:shortCode', async (req, res) => {
+  try {
+    const { shortCode } = req.params;
+    const url = await ShortUrl.findOne({ shortCode });
+    if (url) {
+      url.clicks += 1;
+      await url.save();
+      return res.redirect(url.originalUrl);
+    }
+    return res.status(404).send('Short URL not found');
+  } catch (error) {
+    console.error('URL redirect error:', error);
+    res.status(500).send('Server Error');
+  }
+});
+
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

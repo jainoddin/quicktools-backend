@@ -7,6 +7,7 @@ import { ToolUsage } from '../models/toolUsage.model';
 import { sendAdminNotificationEmail } from '../services/emailService';
 import rateLimit from 'express-rate-limit';
 import { JWT_SECRET } from '../config/env';
+import { ShortUrl } from '../models/ShortUrl';
 
 const router = Router();
 
@@ -49,6 +50,41 @@ router.get('/', (req: Request, res: Response) => {
       slug: 'ai-code-generator',
       category: 'Development',
       image: 'https://cdn-icons-png.flaticon.com/512/10051/10051410.png'
+    },
+    {
+      title: 'AI Text Summarizer',
+      slug: 'ai-summarizer',
+      category: 'Productivity',
+      image: 'https://cdn-icons-png.flaticon.com/512/3159/3159066.png',
+      isFree: true
+    },
+    {
+      title: 'AI Language Translator',
+      slug: 'ai-translator',
+      category: 'Productivity',
+      image: 'https://cdn-icons-png.flaticon.com/512/484/484633.png',
+      isFree: true
+    },
+    {
+      title: 'AI Resume Builder',
+      slug: 'ai-resume-builder',
+      category: 'Productivity',
+      image: 'https://cdn-icons-png.flaticon.com/512/2919/2919592.png',
+      isFree: true
+    },
+    {
+      title: 'AI Color Palette',
+      slug: 'ai-color-palette',
+      category: 'Design',
+      image: 'https://cdn-icons-png.flaticon.com/512/6124/6124995.png',
+      isFree: true
+    },
+    {
+      title: 'URL Shortener',
+      slug: 'url-shortener',
+      category: 'Utilities',
+      image: 'https://cdn-icons-png.flaticon.com/512/1006/1006771.png',
+      isFree: true
     }
   ];
   
@@ -478,6 +514,123 @@ router.post('/report-error', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to process error report:', error);
     res.status(500).json({ success: false, message: 'Failed to process error report.' });
+  }
+});
+
+// -------------------------------------------------------------
+// NEW FREE TOOLS (No credits required)
+// -------------------------------------------------------------
+
+// Helper to save free tool usage
+const saveFreeToolUsage = async (req: Request, toolSlug: string, toolName: string, prompt: string, result: string) => {
+  const token = req.cookies.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded.id) {
+        await ToolUsage.create({
+          userId: decoded.id,
+          toolSlug,
+          toolName,
+          prompt: prompt.substring(0, 500),
+          result,
+          creditsUsed: 0,
+        });
+      }
+    } catch (err) {}
+  }
+};
+
+// POST /api/tools/summarize
+router.post('/summarize', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+
+    const prompt = `Please summarize the following text into clear bullet points. Keep it concise and easy to understand.\n\nText:\n${text}`;
+    const summary = await generateToolText({ prompt, contentType: 'Summary', tone: 'Professional', language: 'English', creativity: 3 });
+
+    await saveFreeToolUsage(req, '/tools/ai-summarizer', 'AI Text Summarizer', text, summary);
+    res.json({ success: true, text: summary });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to summarize text' });
+  }
+});
+
+// POST /api/tools/translate
+router.post('/translate', async (req: Request, res: Response) => {
+  try {
+    const { text, targetLanguage } = req.body;
+    if (!text || !targetLanguage) return res.status(400).json({ success: false, message: 'Text and targetLanguage are required' });
+
+    const prompt = `Translate the following text into ${targetLanguage}. Provide only the translation, no extra text.\n\nText:\n${text}`;
+    const translation = await generateToolText({ prompt, contentType: 'Translation', tone: 'Neutral', language: targetLanguage, creativity: 1 });
+
+    await saveFreeToolUsage(req, '/tools/ai-translator', 'AI Language Translator', `Translate to ${targetLanguage}: ${text}`, translation);
+    res.json({ success: true, text: translation });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to translate text' });
+  }
+});
+
+// POST /api/tools/resume
+router.post('/resume', async (req: Request, res: Response) => {
+  try {
+    const { details } = req.body;
+    if (!details) return res.status(400).json({ success: false, message: 'Details are required' });
+
+    const prompt = `Act as an expert Resume Writer. Create a professional, ATS-friendly resume based on the following details. Format the output nicely in Markdown.\n\nDetails:\n${details}`;
+    const resume = await generateToolText({ prompt, contentType: 'Resume', tone: 'Professional', language: 'English', creativity: 4 });
+
+    await saveFreeToolUsage(req, '/tools/ai-resume-builder', 'AI Resume Builder', details, resume);
+    res.json({ success: true, text: resume });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate resume' });
+  }
+});
+
+// POST /api/tools/color-palette
+router.post('/color-palette', async (req: Request, res: Response) => {
+  try {
+    const { description } = req.body;
+    if (!description) return res.status(400).json({ success: false, message: 'Description is required' });
+
+    const prompt = `Act as an expert Designer. Generate a beautiful color palette based on this description or mood: "${description}". 
+Provide exactly 5 colors. For each color, provide the HEX code and a short name/description. 
+Format as a JSON array of objects, e.g. [{"hex": "#FFFFFF", "name": "Pure White"}]. Output ONLY valid JSON, nothing else.`;
+    
+    let paletteText = await generateToolText({ prompt, contentType: 'JSON', tone: 'Creative', language: 'English', creativity: 7 });
+    
+    // Clean JSON if needed
+    paletteText = paletteText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    await saveFreeToolUsage(req, '/tools/ai-color-palette', 'AI Color Palette', description, paletteText);
+    res.json({ success: true, palette: JSON.parse(paletteText) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate color palette' });
+  }
+});
+
+// POST /api/tools/shorten
+router.post('/shorten', async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
+
+    const shortCode = Math.random().toString(36).substring(2, 8);
+    const newUrl = await ShortUrl.create({ originalUrl: url, shortCode });
+
+    const shortLink = \`/s/\${shortCode}\`;
+    await saveFreeToolUsage(req, '/tools/url-shortener', 'URL Shortener', url, shortLink);
+    
+    res.json({ success: true, shortCode, originalUrl: url });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to shorten URL' });
   }
 });
 
