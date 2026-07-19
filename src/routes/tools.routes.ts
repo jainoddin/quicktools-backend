@@ -8,6 +8,8 @@ import { sendAdminNotificationEmail } from '../services/emailService';
 import rateLimit from 'express-rate-limit';
 import { JWT_SECRET } from '../config/env';
 import { ShortUrl } from '../models/ShortUrl';
+import { premiumPrompts } from '../config/premiumPrompts';
+
 
 const router = Router();
 
@@ -1167,5 +1169,534 @@ router.post('/emoji-translator', async (req: Request, res: Response) => {
   } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
 });
 
+
+
+// POST /api/tools/ai-business-plan
+router.post('/ai-business-plan', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Business Strategist. Generate a comprehensive 10-page business plan based on the following details. Include Executive Summary, Market Analysis, Competitive Advantage, and Financial Projections. Format professionally in Markdown with proper headings.
+
+Details:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Business Plan', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-business-plan', 'Business Plan Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-sales-funnel
+router.post('/ai-sales-funnel', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Copywriter. Write complete sales funnel copy for the following product/service. Include: 1) Facebook Ad Copy, 2) Landing Page Headline & Body, 3) 3-part Email Sequence. Format nicely in Markdown.
+
+Product Details:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Sales Funnel Copy', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-sales-funnel', 'Sales Funnel Copy Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-ebook-writer
+router.post('/ai-ebook-writer', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Author. Write a detailed outline and the first full chapter for an e-book about the following topic. Make the content engaging and informative. Format in Markdown.
+
+Topic:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'E-Book', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-ebook-writer', 'E-Book Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-course-creator
+router.post('/ai-course-creator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Instructional Designer. Create a comprehensive 4-week course curriculum for the following subject. Include weekly modules, lesson titles, and 2 quiz questions per week. Format in Markdown.
+
+Subject:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Course Curriculum', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-course-creator', 'Course Curriculum Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-seo-topical-map
+router.post('/ai-seo-topical-map', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an SEO Expert. Generate a comprehensive Topical Map (Content Cluster) for the following niche. Group the topics into 5 main pillars and provide 5 article titles for each pillar. Format as a nested list in Markdown.
+
+Niche:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'SEO Topical Map', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-seo-topical-map', 'SEO Topical Map Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-pitch-deck
+router.post('/ai-pitch-deck', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Startup Advisor. Generate the content and script for a 10-slide startup pitch deck based on the following idea. Include Problem, Solution, Market Size, Business Model, and Ask. Format in Markdown.
+
+Startup Idea:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Pitch Deck', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-pitch-deck', 'Pitch Deck Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-app-architecture
+router.post('/ai-app-architecture', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as a Senior Software Architect. Design the system architecture for the following application idea. Include the recommended Tech Stack, High-Level Database Schema, and Core API Endpoints. Format clearly in Markdown.
+
+App Idea:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'App Architecture', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-app-architecture', 'App Architecture Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-grant-proposal
+router.post('/ai-grant-proposal', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as an expert Grant Writer. Write a professional and persuasive grant proposal based on the following project details. Include Need Statement, Objectives, Methodology, and Evaluation. Format in Markdown.
+
+Project Details:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Grant Proposal', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-grant-proposal', 'Grant Proposal Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-legal-template
+router.post('/ai-legal-template', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as a Paralegal. Generate a standard, boilerplate legal template based on the following requirement (e.g., NDA, Freelance Contract). Disclaimer: This is for educational purposes and not official legal advice. Format in Markdown.
+
+Requirement:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Legal Template', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-legal-template', 'Legal Template Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-social-calendar
+router.post('/ai-social-calendar', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    // Optional Auth Check
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    // If logged in, check and deduct credits for EVERYONE (Free and Pro)
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+    // If not logged in, we let it pass because frontend allows 1 free trial for guests. 
+    // We could add server-side IP rate-limiting, but this matches ai-writer logic for now.
+
+    const prompt = `Act as a Social Media Manager. Create a 30-day social media content calendar for the following brand/topic. Provide specific post ideas for each day across different platforms (Instagram, LinkedIn, Twitter). Format as a table in Markdown.
+
+Brand/Topic:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Social Media Calendar', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-social-calendar', 'Social Media Calendar Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+
+// POST /api/tools/generate-premium
+router.post('/generate-premium', async (req: Request, res: Response) => {
+  try {
+    const { input, toolSlug, toolName } = req.body;
+    if (!input || !toolSlug) return res.status(400).json({ success: false, message: 'Input and toolSlug are required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade or buy more.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const systemPrompt = premiumPrompts[toolSlug];
+    if (!systemPrompt) {
+      return res.status(400).json({ success: false, message: 'Invalid premium tool slug' });
+    }
+
+    const prompt = `${systemPrompt}\n\nUser Requirement:\n${input}`;
+    
+    const result = await generateToolText({ prompt, contentType: toolName || 'Premium Content', tone: 'Professional', language: 'English', creativity: 7 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/' + toolSlug, toolName || 'Premium Generator', input, result);
+    
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error('Premium Generation Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate premium content' });
+  }
+});
 
 export default router;
