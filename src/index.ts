@@ -37,7 +37,7 @@ const allowedOrigins = new Set(
     'https://quicktools.ai',
     'https://quicktool.space',
     FRONTEND_URL,
-    ...(isProd ? [] : ['http://localhost:3000', 'http://localhost:3001']),
+    ...(isProd ? [] : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005']),
   ].filter(Boolean)
 );
 

@@ -140,11 +140,12 @@ router.post('/generate-text', async (req: Request, res: Response) => {
     });
 
     // 3. Deduct credits and track usage for authenticated users
+    let usageId = null;
     if (user) {
       user.credits -= creditsNeeded;
       await user.save();
 
-      await ToolUsage.create({
+      const usage = await ToolUsage.create({
         userId: user._id,
         toolSlug: toolSlug || '/tools/ai-writer',
         toolName: toolName || 'AI Writer',
@@ -152,12 +153,14 @@ router.post('/generate-text', async (req: Request, res: Response) => {
         result: text,
         creditsUsed: creditsNeeded,
       });
+      usageId = usage._id;
     }
 
     res.json({
       success: true,
       data: text,
-      creditsRemaining: user ? user.credits : 'Guest'
+      creditsRemaining: user ? user.credits : 'Guest',
+      usageId
     });
   } catch (error) {
     console.error('❌ Text generation failed:', error);
@@ -360,6 +363,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
     });
 
     // 3. Deduct credits and track usage for authenticated users
+    let usageId = null;
     if (user) {
       try {
         user.credits -= creditsNeeded;
@@ -463,6 +467,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
     };
 
     // 3. Deduct credits and track usage for authenticated users
+    let usageId = null;
     if (user) {
       user.credits -= creditsNeeded;
       await user.save();
@@ -528,7 +533,7 @@ const saveFreeToolUsage = async (req: Request, toolSlug: string, toolName: strin
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       if (decoded.id) {
-        await ToolUsage.create({
+        const usage = await ToolUsage.create({
           userId: decoded.id,
           toolSlug,
           toolName,
@@ -536,9 +541,11 @@ const saveFreeToolUsage = async (req: Request, toolSlug: string, toolName: strin
           result,
           creditsUsed: 0,
         });
+        return usage._id;
       }
     } catch (err) {}
   }
+  return null;
 };
 
 // POST /api/tools/summarize
@@ -624,7 +631,7 @@ router.post('/shorten', async (req: Request, res: Response) => {
     const shortCode = Math.random().toString(36).substring(2, 8);
     const newUrl = await ShortUrl.create({ originalUrl: url, shortCode });
 
-    const shortLink = \`/s/\${shortCode}\`;
+    const shortLink = `/s/${shortCode}`;
     await saveFreeToolUsage(req, '/tools/url-shortener', 'URL Shortener', url, shortLink);
     
     res.json({ success: true, shortCode, originalUrl: url });
@@ -633,5 +640,532 @@ router.post('/shorten', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Failed to shorten URL' });
   }
 });
+
+// POST /api/tools/grammar
+router.post('/grammar', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+
+    const prompt = `Act as an expert Proofreader. Correct the grammar, spelling, and punctuation of the following text. Make it sound professional and fluent, but keep the original meaning intact. Output ONLY the corrected text without any extra conversational filler.\n\nText:\n${text}`;
+    const result = await generateToolText({ prompt, contentType: 'Grammar Correction', tone: 'Professional', language: 'English', creativity: 2 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-grammar-checker', 'AI Grammar Checker', text, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to correct grammar' });
+  }
+});
+
+// POST /api/tools/caption
+router.post('/caption', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+
+    const prompt = `Act as an expert Social Media Manager. Generate 3 highly engaging captions for an Instagram or Twitter post about "${topic}". Include relevant emojis and 5 trending hashtags for each. Format the output in Markdown with clear separation between options.`;
+    const result = await generateToolText({ prompt, contentType: 'Social Media Caption', tone: 'Engaging', language: 'English', creativity: 8 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-caption-generator', 'AI Caption Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate captions' });
+  }
+});
+
+// POST /api/tools/email
+router.post('/email', async (req: Request, res: Response) => {
+  try {
+    const { emailText, tone } = req.body;
+    if (!emailText) return res.status(400).json({ success: false, message: 'Original email text is required' });
+
+    const prompt = `Act as an expert Communicator. Draft a ${tone || 'Professional'} reply to the following email. Make it clear, concise, and appropriate for the requested tone. Output ONLY the email body.\n\nOriginal Email:\n${emailText}`;
+    const result = await generateToolText({ prompt, contentType: 'Email Reply', tone: tone || 'Professional', language: 'English', creativity: 5 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-email-generator', 'AI Email Reply Generator', `Tone: ${tone || 'Professional'}\nEmail: ${emailText}`, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate email reply' });
+  }
+});
+
+// POST /api/tools/business-name
+router.post('/business-name', async (req: Request, res: Response) => {
+  try {
+    const { keywords } = req.body;
+    if (!keywords) return res.status(400).json({ success: false, message: 'Keywords/Description is required' });
+
+    const prompt = `Act as an expert Branding Consultant. Generate 7 catchy, memorable, and creative business names based on the following keywords or description: "${keywords}". For each name, provide a short, catchy tagline. Format the output clearly as a bulleted list in Markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'Business Name', tone: 'Creative', language: 'English', creativity: 9 });
+
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-business-name-generator', 'AI Business Name Generator', keywords, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate business names' });
+  }
+});
+
+// POST /api/tools/blog-idea
+router.post('/blog-idea', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as an expert Content Marketer. Generate 10 highly engaging and viral blog post ideas or titles about "${topic}". Format as a markdown numbered list.`;
+    const result = await generateToolText({ prompt, contentType: 'Blog Ideas', tone: 'Engaging', language: 'English', creativity: 8 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-blog-idea-generator', 'AI Blog Idea Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate blog ideas' }); }
+});
+
+// POST /api/tools/article-outline
+router.post('/article-outline', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as an expert Content Writer. Create a comprehensive, SEO-optimized article outline for the topic "${topic}". Include H1, H2, and H3 headers. Format nicely in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'Article Outline', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-article-outline-generator', 'AI Article Outline Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate outline' }); }
+});
+
+// POST /api/tools/paraphraser
+router.post('/paraphraser', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+    const prompt = `Act as an expert Editor. Paraphrase and rewrite the following text to make it completely unique while retaining the original meaning. Make it flow beautifully.\n\nText:\n${text}`;
+    const result = await generateToolText({ prompt, contentType: 'Paraphrased Text', tone: 'Professional', language: 'English', creativity: 6 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-paraphraser', 'AI Paraphrasing Tool', text, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to paraphrase' }); }
+});
+
+// POST /api/tools/product-desc
+router.post('/product-desc', async (req: Request, res: Response) => {
+  try {
+    const { productName, features } = req.body;
+    if (!productName || !features) return res.status(400).json({ success: false, message: 'Product name and features are required' });
+    const prompt = `Act as an expert Copywriter. Write a compelling, conversion-focused product description for "${productName}". Key features include: ${features}. Use persuasive language and format in markdown with bullet points for features.`;
+    const result = await generateToolText({ prompt, contentType: 'Product Description', tone: 'Persuasive', language: 'English', creativity: 8 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-product-description', 'AI Product Description Generator', productName, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate product description' }); }
+});
+
+// POST /api/tools/cover-letter
+router.post('/cover-letter', async (req: Request, res: Response) => {
+  try {
+    const { jobTitle, skills } = req.body;
+    if (!jobTitle || !skills) return res.status(400).json({ success: false, message: 'Job title and skills are required' });
+    const prompt = `Act as an expert Career Coach. Write a professional, standout cover letter for the position of "${jobTitle}". The applicant's key skills/experience include: ${skills}. Keep it concise, confident, and format it properly.`;
+    const result = await generateToolText({ prompt, contentType: 'Cover Letter', tone: 'Professional', language: 'English', creativity: 5 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-cover-letter', 'AI Cover Letter Generator', jobTitle, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate cover letter' }); }
+});
+
+// POST /api/tools/seo-meta
+router.post('/seo-meta', async (req: Request, res: Response) => {
+  try {
+    const { pageContent } = req.body;
+    if (!pageContent) return res.status(400).json({ success: false, message: 'Page content/topic is required' });
+    const prompt = `Act as an SEO Expert. Based on this page content/topic: "${pageContent}", generate 3 options for an SEO-optimized Page Title (max 60 chars) and Meta Description (max 160 chars). Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'SEO Meta Tags', tone: 'Professional', language: 'English', creativity: 6 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-seo-meta-generator', 'AI SEO Title & Meta Generator', pageContent, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate SEO meta tags' }); }
+});
+
+// POST /api/tools/youtube-title
+router.post('/youtube-title', async (req: Request, res: Response) => {
+  try {
+    const { videoTopic } = req.body;
+    if (!videoTopic) return res.status(400).json({ success: false, message: 'Video topic is required' });
+    const prompt = `Act as a YouTube Growth Hacker. Generate 10 highly clickable, viral, and engaging YouTube video titles for the topic: "${videoTopic}". Format as a markdown numbered list.`;
+    const result = await generateToolText({ prompt, contentType: 'YouTube Titles', tone: 'Engaging', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-youtube-title', 'AI YouTube Title Generator', videoTopic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate titles' }); }
+});
+
+// POST /api/tools/tweet-thread
+router.post('/tweet-thread', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as an expert Twitter Ghostwriter. Write a highly engaging, viral Twitter thread about "${topic}". The first tweet should be a strong hook. Include emojis and format each tweet clearly (e.g., 1/5, 2/5).`;
+    const result = await generateToolText({ prompt, contentType: 'Twitter Thread', tone: 'Engaging', language: 'English', creativity: 8 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-tweet-thread', 'AI Tweet Thread Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate thread' }); }
+});
+
+// POST /api/tools/hook-generator
+router.post('/hook-generator', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as a TikTok/Reels Scriptwriter. Generate 7 extremely catchy and curiosity-inducing 3-second hooks for a short video about "${topic}". Format as a markdown bulleted list.`;
+    const result = await generateToolText({ prompt, contentType: 'Video Hooks', tone: 'Engaging', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-hook-generator', 'AI Hook Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate hooks' }); }
+});
+
+// POST /api/tools/ad-copy
+router.post('/ad-copy', async (req: Request, res: Response) => {
+  try {
+    const { product, platform } = req.body;
+    if (!product || !platform) return res.status(400).json({ success: false, message: 'Product and platform are required' });
+    const prompt = `Act as a top-tier Media Buyer. Write 3 highly converting ad copy variations for "${product}" designed specifically for ${platform} Ads. Include Primary Text, Headline, and Call to Action. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'Ad Copy', tone: 'Persuasive', language: 'English', creativity: 8 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-ad-copy', 'AI Ad Copy Generator', `${platform}: ${product}`, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate ad copy' }); }
+});
+
+// POST /api/tools/linkedin-bio
+router.post('/linkedin-bio', async (req: Request, res: Response) => {
+  try {
+    const { currentRole, achievements } = req.body;
+    if (!currentRole || !achievements) return res.status(400).json({ success: false, message: 'Role and achievements are required' });
+    const prompt = `Act as a Personal Branding Expert. Write an optimized, professional, and engaging LinkedIn "About" section bio. Current Role: "${currentRole}". Key Achievements/Skills: "${achievements}". Keep it structured with short paragraphs.`;
+    const result = await generateToolText({ prompt, contentType: 'LinkedIn Bio', tone: 'Professional', language: 'English', creativity: 6 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-linkedin-bio', 'AI LinkedIn Bio Generator', currentRole, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate bio' }); }
+});
+
+// POST /api/tools/regex-generator
+router.post('/regex-generator', async (req: Request, res: Response) => {
+  try {
+    const { description } = req.body;
+    if (!description) return res.status(400).json({ success: false, message: 'Description is required' });
+    const prompt = `Act as a Senior Developer. Provide a Regular Expression (Regex) that matches the following description: "${description}". Provide ONLY the regex pattern inside a markdown code block, followed by a brief 1-sentence explanation of how it works.`;
+    const result = await generateToolText({ prompt, contentType: 'Regex Pattern', tone: 'Technical', language: 'English', creativity: 2 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-regex-generator', 'Regex Generator', description, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate regex' }); }
+});
+
+// POST /api/tools/quote
+router.post('/quote', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as an inspirational figure. Generate a highly inspiring, completely original motivational quote about "${topic}". The quote should be impactful and memorable. Do not use existing famous quotes.`;
+    const result = await generateToolText({ prompt, contentType: 'Motivational Quote', tone: 'Inspiring', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-quote-generator', 'AI Motivational Quote Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate quote' }); }
+});
+
+// POST /api/tools/code-explainer
+router.post('/code-explainer', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ success: false, message: 'Code is required' });
+    const prompt = `Act as an expert Senior Developer. Explain the following code snippet in plain, easy-to-understand English. Break down what the code does step-by-step.\n\nCode:\n${code}`;
+    const result = await generateToolText({ prompt, contentType: 'Code Explanation', tone: 'Educational', language: 'English', creativity: 3 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-code-explainer', 'AI Code Explainer', code.substring(0, 100), result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to explain code' }); }
+});
+
+// POST /api/tools/recipe-generator
+router.post('/recipe-generator', async (req: Request, res: Response) => {
+  try {
+    const { ingredients } = req.body;
+    if (!ingredients) return res.status(400).json({ success: false, message: 'Ingredients are required' });
+    const prompt = `Act as a Master Chef. Create a delicious recipe using mostly or only these ingredients: "${ingredients}". Provide a creative name for the dish, prep time, cooking time, step-by-step instructions, and tips. Format nicely in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'Recipe', tone: 'Friendly', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-recipe-generator', 'AI Recipe Generator', ingredients, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate recipe' }); }
+});
+
+// POST /api/tools/workout-generator
+router.post('/workout-generator', async (req: Request, res: Response) => {
+  try {
+    const { goal, level, duration } = req.body;
+    if (!goal || !level) return res.status(400).json({ success: false, message: 'Goal and level are required' });
+    const prompt = `Act as an expert Personal Trainer. Create a structured, easy-to-follow workout plan. Goal: "${goal}". Fitness Level: "${level}". Duration per session: ${duration} minutes. Include exercises, sets, and reps. Format nicely in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'Workout Plan', tone: 'Motivating', language: 'English', creativity: 5 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-workout-generator', 'AI Workout Plan Generator', `${goal} (${level})`, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate workout plan' }); }
+});
+
+// POST /api/tools/motivational-quote
+router.post('/motivational-quote', async (req: Request, res: Response) => {
+  try {
+    const { topic } = req.body;
+    if (!topic) return res.status(400).json({ success: false, message: 'Topic is required' });
+    const prompt = `Act as an inspiring philosopher and thought leader. Write 5 completely original, profound, and highly motivational quotes about "${topic}". Format as a markdown list.`;
+    const result = await generateToolText({ prompt, contentType: 'Motivational Quotes', tone: 'Inspiring', language: 'English', creativity: 10 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-motivational-quote-generator', 'AI Motivational Quote Generator', topic, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate quotes' }); }
+});
+
+// POST /api/tools/gift-idea
+router.post('/gift-idea', async (req: Request, res: Response) => {
+  try {
+    const { recipient, budget, interests } = req.body;
+    if (!recipient || !interests) return res.status(400).json({ success: false, message: 'Recipient and interests are required' });
+    const prompt = `Act as a master Gift Concierge. Suggest 7 highly thoughtful, unique, and creative gift ideas for a ${recipient} who is interested in: "${interests}". Budget: ${budget}. Format as a markdown bulleted list with a brief reason for each suggestion.`;
+    const result = await generateToolText({ prompt, contentType: 'Gift Ideas', tone: 'Friendly', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-gift-idea-generator', 'AI Gift Idea Generator', `${recipient} (${interests})`, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate gift ideas' }); }
+});
+
+// ✅ 20 NEW BATCH TOOLS ROUTES
+
+// POST /api/tools/interview-questions
+router.post('/interview-questions', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Technical Recruiter and Hiring Manager. Generate 10 highly relevant, challenging, and insightful interview questions for the following role: "${input}". Include a mix of technical, behavioral, and situational questions. Format as a markdown list.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Interview Questions Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-interview-questions', 'AI Interview Questions Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/sql-generator
+router.post('/sql-generator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Senior Database Administrator. Generate a highly optimized SQL query based on this request: "${input}". Provide ONLY the SQL code in a markdown block, followed by a brief 1-sentence explanation.`;
+    const result = await generateToolText({ prompt, contentType: 'AI SQL Query Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-sql-generator', 'AI SQL Query Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/slogan-generator
+router.post('/slogan-generator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Copywriter. Generate 10 catchy, creative, and memorable slogans for the following brand/product: "${input}". Keep them punchy and impactful. Format as a markdown bulleted list.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Slogan Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-slogan-generator', 'AI Slogan Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/elevator-pitch
+router.post('/elevator-pitch', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Career Coach and Sales Strategist. Write 3 compelling, persuasive, and concise elevator pitches (under 60 seconds spoken) based on this information: "${input}". Format in markdown with bold headings.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Elevator Pitch Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-elevator-pitch', 'AI Elevator Pitch Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/video-script
+router.post('/video-script', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Viral Content Creator and Scriptwriter. Write a highly engaging, fast-paced video script about "${input}". Include visual cues (e.g., [Camera zooms in]) and a strong hook in the first 3 seconds. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Video Script Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-video-script', 'AI Video Script Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/job-description
+router.post('/job-description', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert HR Manager. Write a comprehensive, professional, and attractive job description for: "${input}". Include sections for About the Role, Key Responsibilities, Requirements, and Benefits. Format beautifully in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Job Description Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-job-description', 'AI Job Description Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/hashtag-generator
+router.post('/hashtag-generator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Social Media Marketing Expert. Generate 30 highly relevant, trending, and optimized hashtags for a post about: "${input}". Group them into Broad, Niche, and Location/Specific categories. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Instagram Hashtag Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-hashtag-generator', 'AI Instagram Hashtag Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/story-generator
+router.post('/story-generator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Bestselling Novelist. Write a captivating, creative, and well-structured short story based on this prompt: "${input}". Focus on showing, not telling, and include strong character dialogue. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Story Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-story-generator', 'AI Story Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/travel-planner
+router.post('/travel-planner', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Travel Agent. Create a detailed, day-by-day travel itinerary for "${input}". Include morning, afternoon, and evening activities, plus local food recommendations. Format nicely in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Travel Itinerary Planner', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-travel-planner', 'AI Travel Itinerary Planner', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/meal-planner
+router.post('/meal-planner', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a certified Nutritionist. Create a 7-day meal plan based on these requirements: "${input}". Include Breakfast, Lunch, Dinner, and Snacks for each day. Format as a clean markdown table or structured list.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Meal Planner', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-meal-planner', 'AI Meal Planner', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/poem-generator
+router.post('/poem-generator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Master Poet. Write a beautiful, evocative, and creative poem based on this topic and style: "${input}". Use strong imagery and emotional resonance. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Poem Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-poem-generator', 'AI Poem Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/review-responder
+router.post('/review-responder', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Professional Customer Success Manager. Write a polite, empathetic, and professional response to the following customer review: "${input}". If it is a negative review, de-escalate and offer a solution. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Review Responder', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-review-responder', 'AI Review Responder', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/event-planner
+router.post('/event-planner', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Event Coordinator. Create a comprehensive event plan and checklist for: "${input}". Include a timeline (months/weeks before), budget tips, and day-of schedule. Format cleanly in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Event Planner', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-event-planner', 'AI Event Planner', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/youtube-tags
+router.post('/youtube-tags', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a YouTube SEO Expert. Generate a comma-separated list of 30 highly optimized, high-volume search tags/keywords for a video about: "${input}". Put them in a code block so they are easy to copy.`;
+    const result = await generateToolText({ prompt, contentType: 'AI YouTube Tags Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-youtube-tags', 'AI YouTube Tags Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/apology-letter
+router.post('/apology-letter', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Communicator. Write a sincere, professional, and well-structured apology letter based on this situation: "${input}". Do not make overly defensive excuses. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Apology Letter Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-apology-letter', 'AI Apology Letter Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/dream-interpreter
+router.post('/dream-interpreter', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert Psychologist and Dream Analyst (like Carl Jung). Provide a fascinating, symbolic, and psychological interpretation of this dream: "${input}". Format in markdown with bold headings.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Dream Interpreter', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-dream-interpreter', 'AI Dream Interpreter', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/git-command
+router.post('/git-command', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a Senior DevOps Engineer. Provide the exact Git terminal command(s) needed to accomplish this: "${input}". Put the commands in a bash markdown block, followed by a very brief explanation.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Git Command Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-git-command', 'AI Git Command Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/real-estate-listing
+router.post('/real-estate-listing', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as a top-tier Real Estate Copywriter. Write an engaging, highly attractive property listing description based on these details: "${input}". Highlight the best features. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Real Estate Listing Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-real-estate-listing', 'AI Real Estate Listing Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/resignation-letter
+router.post('/resignation-letter', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert HR Professional. Write a polite, professional, and standard resignation letter based on these details: "${input}". Ensure it leaves a positive final impression. Format in markdown.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Resignation Letter Generator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-resignation-letter', 'AI Resignation Letter Generator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
+// POST /api/tools/emoji-translator
+router.post('/emoji-translator', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+    const prompt = `Act as an expert in internet culture and emojis. Translate the following text purely into a creative, expressive sequence of emojis that tells the story visually: "${input}". Provide ONLY the emojis, no text.`;
+    const result = await generateToolText({ prompt, contentType: 'AI Emoji Translator', tone: 'Professional', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-emoji-translator', 'AI Emoji Translator', input, result);
+    res.json({ success: true, text: result, usageId });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
+});
+
 
 export default router;
