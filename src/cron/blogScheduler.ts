@@ -4,6 +4,7 @@ import { Article } from '../models/Article';
 import { News } from '../models/News';
 import { User } from '../models/user.model';
 import { CronFailure } from '../models/CronFailure';
+import { CronLock } from '../models/CronLock';
 import { generateBlog } from '../services/gemini.service';
 import { generateArticle } from '../services/articleGenerator';
 import { generateNews } from '../services/newsGenerator';
@@ -80,11 +81,35 @@ async function handleCronFailure(type: string, error: any) {
 }
 
 export function startCronJobs() {
+  // Helper to acquire distributed lock
+  const acquireLock = async (key: string): Promise<boolean> => {
+    try {
+      const result = await CronLock.findOneAndUpdate(
+        { key },
+        { $setOnInsert: { key, createdAt: new Date() } },
+        { upsert: true, returnDocument: 'before' } // returns null if it was newly inserted
+      );
+      return result === null;
+    } catch (err) {
+      console.error('Error acquiring lock:', err);
+      return false;
+    }
+  };
+
   // 1. Blog: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 9 AM and 11 PM IST
   cron.schedule('2-59/5 9-23 * * *', async () => {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lockKey = `blog-${todayStr}`;
+      
+      const hasLock = await acquireLock(lockKey);
+      if (!hasLock) {
+        console.log('⚠️ Blog lock already acquired by another process today. Skipping.');
+        return;
+      }
+
       // Enforce exactly 1 blog per day
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -119,6 +144,15 @@ export function startCronJobs() {
     console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lockKey = `article-${todayStr}`;
+      
+      const hasLock = await acquireLock(lockKey);
+      if (!hasLock) {
+        console.log('⚠️ Article lock already acquired by another process today. Skipping.');
+        return;
+      }
+
       // Enforce exactly 1 article per day
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -152,19 +186,19 @@ export function startCronJobs() {
   // Morning News (8:02 AM IST first try, retry every 5 mins in 8:00 AM - 12:59 PM slot)
   cron.schedule('2-59/5 8-12 * * *', async () => {
     console.log('⏰ Morning NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Morning', 'news_morning');
+    await generateSingleNewsJob('Morning', 'news_morning', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
   // Afternoon News (1:02 PM IST first try, retry every 5 mins in 1:00 PM - 7:59 PM slot)
   cron.schedule('2-59/5 13-19 * * *', async () => {
     console.log('⏰ Afternoon NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Afternoon', 'news_afternoon');
+    await generateSingleNewsJob('Afternoon', 'news_afternoon', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
   // Night News (8:02 PM IST first try, retry every 5 mins in 8:00 PM - 11:59 PM slot)
   cron.schedule('2-59/5 20-23 * * *', async () => {
     console.log('⏰ Night NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Night', 'news_night');
+    await generateSingleNewsJob('Night', 'news_night', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
   // Purge accounts deactivated for more than 15 days (daily at 3:00 AM IST)
@@ -190,8 +224,16 @@ export function startCronJobs() {
 }
 
 // Helper function to generate exactly 1 news item per slot
-async function generateSingleNewsJob(timeSlot: string, failureType: string) {
+async function generateSingleNewsJob(timeSlot: string, failureType: string, acquireLock: (key: string) => Promise<boolean>) {
   try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lockKey = `news-${timeSlot}-${todayStr}`;
+    
+    const hasLock = await acquireLock(lockKey);
+    if (!hasLock) {
+      console.log(`⚠️ ${timeSlot} News lock already acquired by another process today. Skipping.`);
+      return;
+    }
     // Enforce exactly required news per day to prevent duplicate retries
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -232,4 +274,3 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string) {
     await handleCronFailure(failureType, error);
   }
 }
-
