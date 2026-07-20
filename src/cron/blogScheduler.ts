@@ -102,9 +102,9 @@ export function startCronJobs() {
   cron.schedule('2-59/5 9-23 * * *', async () => {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lockKey = `blog-${todayStr}`;
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const lockKey = `blog-${todayStr}`;
       
       const hasLock = await acquireLock(lockKey);
       if (!hasLock) {
@@ -136,6 +136,7 @@ export function startCronJobs() {
     } catch (error) {
       console.error('❌ Cron blog generation failed:', error);
       await handleCronFailure('blog', error);
+      await CronLock.deleteOne({ key: lockKey });
     }
   }, {
     timezone: 'Asia/Kolkata',
@@ -145,9 +146,9 @@ export function startCronJobs() {
   cron.schedule('2-59/5 21-23 * * *', async () => {
     console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lockKey = `article-${todayStr}`;
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const lockKey = `article-${todayStr}`;
       
       const hasLock = await acquireLock(lockKey);
       if (!hasLock) {
@@ -178,6 +179,7 @@ export function startCronJobs() {
     } catch (error) {
       console.error('❌ Cron article generation failed:', error);
       await handleCronFailure('article', error);
+      await CronLock.deleteOne({ key: lockKey });
     }
   }, {
     timezone: 'Asia/Kolkata',
@@ -269,9 +271,9 @@ export function startCronJobs() {
 
 // Helper function to generate exactly 1 news item per slot
 async function generateSingleNewsJob(timeSlot: string, failureType: string, acquireLock: (key: string) => Promise<boolean>) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lockKey = `news-${timeSlot}-${todayStr}`;
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const lockKey = `news-${timeSlot}-${todayStr}`;
     
     const hasLock = await acquireLock(lockKey);
     if (!hasLock) {
@@ -316,5 +318,6 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
   } catch (error) {
     console.error(`❌ Cron ${timeSlot} news generation failed:`, error);
     await handleCronFailure(failureType, error);
+    await CronLock.deleteOne({ key: lockKey });
   }
 }
