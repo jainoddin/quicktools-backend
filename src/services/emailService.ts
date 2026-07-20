@@ -72,3 +72,28 @@ export const sendAdminNotificationEmail = async (subject: string, contentHTML: s
     return false;
   }
 };
+
+export const sendMarketingEmail = async (bccEmails: string[], subject: string, contentHTML: string) => {
+  try {
+    if (!process.env.EMAIL_PASS) {
+      console.warn("EMAIL_PASS not set in .env. Skipping marketing email.");
+      return false;
+    }
+
+    if (!bccEmails || bccEmails.length === 0) return false;
+
+    // Send emails using BCC to protect user privacy
+    const info = await transporter.sendMail({
+      from: `"QuickTools AI" <${process.env.EMAIL_USER || 'helloquicktool@gmail.com'}>`,
+      to: process.env.EMAIL_USER || 'helloquicktool@gmail.com', // To ourselves
+      bcc: bccEmails, // Bcc all users
+      subject: subject,
+      html: contentHTML,
+    });
+    console.log("Marketing email sent to %d users. MessageId: %s", bccEmails.length, info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending marketing email:", error);
+    return false;
+  }
+};

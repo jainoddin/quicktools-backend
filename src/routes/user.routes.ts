@@ -110,6 +110,33 @@ router.patch('/usage/:id/favorite', authenticate, async (req: Request, res: Resp
   }
 });
 
+// POST /api/user/usage (For client-side only tools like Text-to-Speech)
+router.post('/usage', authenticate, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { toolSlug, toolName, prompt, result, creditsUsed = 0 } = req.body;
+
+    if (!toolSlug || !prompt || !toolName) {
+      return res.status(400).json({ success: false, message: 'Missing toolSlug, toolName, or prompt' });
+    }
+
+    const usage = new ToolUsage({
+      userId: user._id,
+      toolSlug,
+      toolName,
+      prompt,
+      result,
+      creditsUsed
+    });
+
+    await usage.save();
+    res.json({ success: true, data: usage });
+  } catch (error) {
+    console.error('Error saving usage:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // DELETE /api/user/usage
 router.delete('/usage', authenticate, async (req: Request, res: Response) => {
   try {

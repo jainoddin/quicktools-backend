@@ -9,6 +9,8 @@ import { generateBlog } from '../services/gemini.service';
 import { generateArticle } from '../services/articleGenerator';
 import { generateNews } from '../services/newsGenerator';
 import { sendAdminNotificationEmail } from '../services/emailService';
+import { generateAndSendMarketingEmail } from '../services/marketingGenerator';
+import { generateAndPostToSocialMedia } from '../services/socialMediaGenerator';
 
 // Helper to get current date string in Asia/Kolkata timezone (YYYY-MM-DD)
 const getKolkataDateString = () => {
@@ -216,10 +218,52 @@ export function startCronJobs() {
     }
   }, { timezone: 'Asia/Kolkata' });
 
+  // Marketing Email: Runs daily at 10:00 AM IST
+  cron.schedule('0 10 * * *', async () => {
+    console.log('⏰ Marketing Email cron triggered at', new Date().toISOString());
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lockKey = `marketing-email-${todayStr}`;
+      
+      const hasLock = await acquireLock(lockKey);
+      if (!hasLock) {
+        console.log('⚠️ Marketing Email lock already acquired by another process today. Skipping.');
+        return;
+      }
+
+      await generateAndSendMarketingEmail();
+    } catch (error) {
+      console.error('❌ Cron marketing email failed:', error);
+      await handleCronFailure('marketing_email', error);
+    }
+  }, { timezone: 'Asia/Kolkata' });
+
+  // Social Media Blast: Runs daily at 10:30 AM IST
+  cron.schedule('30 10 * * *', async () => {
+    console.log('⏰ Social Media Auto-Poster cron triggered at', new Date().toISOString());
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lockKey = `social-media-${todayStr}`;
+      
+      const hasLock = await acquireLock(lockKey);
+      if (!hasLock) {
+        console.log('⚠️ Social Media lock already acquired by another process today. Skipping.');
+        return;
+      }
+
+      await generateAndPostToSocialMedia();
+    } catch (error) {
+      console.error('❌ Cron social media posting failed:', error);
+      await handleCronFailure('social_media', error);
+    }
+  }, { timezone: 'Asia/Kolkata' });
+
   console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
   console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
+  console.log('   - Marketing Email: 10:00 AM daily');
+  console.log('   - Social Media Auto-Poster: 10:30 AM daily (LinkedIn, FB, Twitter, Insta)');
   console.log('   - Accounts: Purge deactivated (15+ days) — 3:00 AM daily');
 }
 
