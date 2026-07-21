@@ -240,32 +240,40 @@ export function startCronJobs() {
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  // Social Media Blast: Runs daily at 10:30 AM IST
-  cron.schedule('30 10 * * *', async () => {
-    console.log('⏰ Social Media Auto-Poster cron triggered at', new Date().toISOString());
-    try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const lockKey = `social-media-${todayStr}`;
-      
-      const hasLock = await acquireLock(lockKey);
-      if (!hasLock) {
-        console.log('⚠️ Social Media lock already acquired by another process today. Skipping.');
-        return;
-      }
+  // Social Media Blast: 3 times a day (9:30 AM, 2:30 PM, 7:30 PM IST)
+  const socialSlots = [
+    { name: 'Morning', cronTime: '30 9 * * *' },
+    { name: 'Afternoon', cronTime: '30 14 * * *' },
+    { name: 'Evening', cronTime: '30 19 * * *' }
+  ];
 
-      await generateAndPostToSocialMedia();
-    } catch (error) {
-      console.error('❌ Cron social media posting failed:', error);
-      await handleCronFailure('social_media', error);
-    }
-  }, { timezone: 'Asia/Kolkata' });
+  socialSlots.forEach(slot => {
+    cron.schedule(slot.cronTime, async () => {
+      console.log(`⏰ Social Media Auto-Poster (${slot.name}) cron triggered at`, new Date().toISOString());
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lockKey = `social-media-${slot.name.toLowerCase()}-${todayStr}`;
+        
+        const hasLock = await acquireLock(lockKey);
+        if (!hasLock) {
+          console.log(`⚠️ Social Media ${slot.name} lock already acquired by another process today. Skipping.`);
+          return;
+        }
+
+        await generateAndPostToSocialMedia();
+      } catch (error) {
+        console.error(`❌ Cron social media posting (${slot.name}) failed:`, error);
+        await handleCronFailure(`social_media_${slot.name.toLowerCase()}`, error);
+      }
+    }, { timezone: 'Asia/Kolkata' });
+  });
 
   console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
   console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Marketing Email: 10:00 AM daily');
-  console.log('   - Social Media Auto-Poster: 10:30 AM daily (LinkedIn, FB, Twitter, Insta)');
+  console.log('   - Social Media Auto-Poster: 9:30 AM, 2:30 PM, 7:30 PM daily (LinkedIn, FB, Insta)');
   console.log('   - Accounts: Purge deactivated (15+ days) — 3:00 AM daily');
 }
 
