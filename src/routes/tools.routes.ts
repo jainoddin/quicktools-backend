@@ -1699,4 +1699,194 @@ router.post('/generate-premium', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/tools/ai-legal-loophole-finder
+router.post('/ai-legal-loophole-finder', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ success: false, message: 'Not enough credits. Please upgrade or buy more.', errorType: 'INSUFFICIENT_CREDITS' });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const prompt = `Act as an expert Corporate Lawyer. Review the following legal document/contract and identify any "Red Flags", hidden loopholes, or highly disadvantageous clauses for the signer. Explain them in simple, easy-to-understand language. Structure in Markdown.
+
+Document:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Legal Loophole Analysis', tone: 'Professional', language: 'English', creativity: 5 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-legal-loophole-finder', 'Legal Loophole Finder', input, result);
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-conflict-resolver
+router.post('/ai-conflict-resolver', async (req: Request, res: Response) => {
+  try {
+    const { input, tone } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ success: false, message: 'Not enough credits.', errorType: 'INSUFFICIENT_CREDITS' });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const prompt = `Act as an expert Psychologist and Conflict Resolution Specialist. Read the following conflict/angry message situation. Craft a mature, de-escalating, and psychologically sound response that resolves the conflict peacefully without compromising boundaries. Tone should be ${tone || 'calm and empathetic'}. Format in Markdown with the suggested reply and the psychological reasoning behind it.
+
+Situation/Message:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Conflict Resolution', tone: tone || 'Empathetic', language: 'English', creativity: 7 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-conflict-resolver', 'Conflict Resolver', input, result);
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-dream-interpreter
+router.post('/ai-dream-interpreter', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ success: false, message: 'Not enough credits.', errorType: 'INSUFFICIENT_CREDITS' });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const prompt = `Act as a Jungian Psychoanalyst. Interpret the following dream. Provide the psychological meaning, potential hidden messages from the subconscious, and symbols decoded. Be insightful and slightly mystical but grounded in psychology. Format in Markdown.
+
+Dream Description:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Dream Interpretation', tone: 'Insightful', language: 'English', creativity: 9 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-dream-interpreter', 'Dream Interpreter', input, result);
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-analogy-generator
+router.post('/ai-analogy-generator', async (req: Request, res: Response) => {
+  try {
+    const { input, theme } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ success: false, message: 'Not enough credits.', errorType: 'INSUFFICIENT_CREDITS' });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const prompt = `Explain the following complex topic/jargon using a simple, relatable analogy based on the theme of "${theme || 'Everyday Life'}". Make it easy enough for a 10-year-old to understand. Format in Markdown.
+
+Complex Topic:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Analogy', tone: 'Educational', language: 'English', creativity: 8 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-analogy-generator', 'Analogy Generator', input, result);
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
+// POST /api/tools/ai-subscription-optimizer
+router.post('/ai-subscription-optimizer', async (req: Request, res: Response) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
+
+    let user = null;
+    let creditsNeeded = 5;
+    
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        user = await User.findById(decoded.id);
+      } catch (err) {}
+    }
+
+    if (user) {
+      if (user.credits < creditsNeeded) {
+        return res.status(403).json({ success: false, message: 'Not enough credits.', errorType: 'INSUFFICIENT_CREDITS' });
+      }
+      user.credits -= creditsNeeded;
+      await user.save();
+    }
+
+    const prompt = `Act as a Financial Optimizer. Review the following list of active subscriptions from a user. Identify feature overlaps (e.g., Spotify and YouTube Premium), calculate wasted money, and provide a strict action plan on what to cancel to save the maximum amount of money without losing core features. Format in Markdown.
+
+Subscriptions List:
+${input}`;
+    const result = await generateToolText({ prompt, contentType: 'Subscription Analysis', tone: 'Direct and Helpful', language: 'English', creativity: 5 });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-subscription-optimizer', 'Subscription Optimizer', input, result);
+    res.json({ success: true, text: result, usageId, creditsRemaining: user ? user.credits : undefined });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate content' });
+  }
+});
+
 export default router;
