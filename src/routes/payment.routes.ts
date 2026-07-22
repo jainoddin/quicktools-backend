@@ -40,9 +40,9 @@ router.post('/create-order', paymentRateLimit, async (req: Request, res: Respons
     // Amount lo define cheyyi — frontend trust kaakudadu!
     // ₹1 = 100 paise
     const PLAN_AMOUNTS: Record<string, number> = {
-      starter:  49900,   // ₹499
-      pro:      5782,    // ₹49 + 18% GST (₹57.82)
-      business: 11682,   // ₹99 + 18% GST (₹116.82)
+      starter:  49900,   // ₹499 (~$5 + GST)
+      pro:      199900,  // ₹1999 (~$20 + GST)
+      business: 499900,  // ₹4999 (~$50 + GST)
       test:     100,     // ₹1 test
     };
 
