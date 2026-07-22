@@ -241,10 +241,10 @@ export function startCronJobs() {
   }, { timezone: 'Asia/Kolkata' });
 
   // Social Media Blast: 3 times a day with robust retry logic (Every 5 mins until success)
-  // Morning: 9:30 AM - 12:59 PM
+  // Morning: 9:36 AM - 12:59 PM
   cron.schedule('2-59/5 9-12 * * *', async () => {
     const now = new Date();
-    if (now.getHours() === 9 && now.getMinutes() < 30) return; // Wait for 9:30 AM
+    if (now.getHours() === 9 && now.getMinutes() < 36) return; // Wait for 9:36 AM
     console.log('⏰ Morning Social Media cron triggered at', now.toISOString());
     await executeSocialMediaJob('Morning', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
