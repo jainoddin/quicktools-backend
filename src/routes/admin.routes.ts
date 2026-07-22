@@ -72,6 +72,7 @@ router.get('/users', isAdmin, async (req: Request, res: Response) => {
         plan: u.plan,
         credits: u.credits,
         createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
       }))
     });
   } catch (error) {
