@@ -240,35 +240,30 @@ export function startCronJobs() {
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  // Social Media Blast: 3 times a day (9:30 AM, 2:30 PM, 7:30 PM IST)
-  const socialSlots = [
-    { name: 'Morning', cronTime: '30 9 * * *' },
-    { name: 'Afternoon', cronTime: '30 14 * * *' },
-    { name: 'Evening', cronTime: '30 19 * * *' }
-  ];
+  // Social Media Blast: 3 times a day with robust retry logic (Every 5 mins until success)
+  // Morning: 9:30 AM - 12:59 PM
+  cron.schedule('2-59/5 9-12 * * *', async () => {
+    const now = new Date();
+    if (now.getHours() === 9 && now.getMinutes() < 30) return; // Wait for 9:30 AM
+    console.log('⏰ Morning Social Media cron triggered at', now.toISOString());
+    await executeSocialMediaJob('Morning', acquireLock);
+  }, { timezone: 'Asia/Kolkata' });
 
-  socialSlots.forEach(slot => {
-    cron.schedule(slot.cronTime, async () => {
-      console.log(`⏰ Social Media Auto-Poster (${slot.name}) cron triggered at`, new Date().toISOString());
-      try {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const lockKey = `social-media-${slot.name.toLowerCase()}-${todayStr}`;
-        
-        const hasLock = await acquireLock(lockKey);
-        if (!hasLock) {
-          console.log(`⚠️ Social Media ${slot.name} lock already acquired by another process today. Skipping.`);
-          return;
-        }
+  // Afternoon: 2:30 PM - 5:59 PM
+  cron.schedule('2-59/5 14-17 * * *', async () => {
+    const now = new Date();
+    if (now.getHours() === 14 && now.getMinutes() < 30) return; // Wait for 2:30 PM
+    console.log('⏰ Afternoon Social Media cron triggered at', now.toISOString());
+    await executeSocialMediaJob('Afternoon', acquireLock);
+  }, { timezone: 'Asia/Kolkata' });
 
-        await generateAndPostToSocialMedia();
-      } catch (error) {
-        console.error(`❌ Cron social media posting (${slot.name}) failed:`, error);
-        await handleCronFailure(`social_media_${slot.name.toLowerCase()}`, error);
-      }
-    }, { timezone: 'Asia/Kolkata' });
-  });
-
-  console.log('✅ Cron jobs scheduled (Asia/Kolkata):');
+  // Evening: 7:30 PM - 10:59 PM
+  cron.schedule('2-59/5 19-22 * * *', async () => {
+    const now = new Date();
+    if (now.getHours() === 19 && now.getMinutes() < 30) return; // Wait for 7:30 PM
+    console.log('⏰ Evening Social Media cron triggered at', now.toISOString());
+    await executeSocialMediaJob('Evening', acquireLock);
+  }, { timezone: 'Asia/Kolkata' });
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
   console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
@@ -326,6 +321,28 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
   } catch (error) {
     console.error(`❌ Cron ${timeSlot} news generation failed:`, error);
     await handleCronFailure(failureType, error);
+    await CronLock.deleteOne({ key: lockKey });
+  }
+}
+
+// Helper function to execute and lock Social Media Jobs with retry
+async function executeSocialMediaJob(timeSlot: string, acquireLock: (key: string) => Promise<boolean>) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lockKey = `social-media-${timeSlot.toLowerCase()}-${todayStr}`;
+  try {
+    const hasLock = await acquireLock(lockKey);
+    if (!hasLock) {
+      console.log(`⚠️ Social Media ${timeSlot} lock already acquired today. Skipping.`);
+      return;
+    }
+
+    await generateAndPostToSocialMedia();
+    console.log(`✅ Successfully triggered Social Media post for ${timeSlot}`);
+  } catch (error) {
+    console.error(`❌ Cron social media posting (${timeSlot}) failed:`, error);
+    // This will send an email alert via handleCronFailure
+    await handleCronFailure(`social_media_${timeSlot.toLowerCase()}`, error);
+    // Delete lock so it can retry in the next 5 mins
     await CronLock.deleteOne({ key: lockKey });
   }
 }
