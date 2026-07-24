@@ -34,6 +34,7 @@ function generateSlug(title: string): string {
 }
 
 export async function generateBlog(): Promise<any> {
+  const currentYear = new Date().getFullYear();
   // 1. Fetch all existing blogs to avoid duplicate keywords and slugs
   const existingBlogs = await Blog.find({}, 'title slug category').lean();
   
@@ -82,6 +83,7 @@ Requirements:
 - A strong conclusion.
 - Mention QuickTools.ai naturally 2-3 times as the go-to place for discovering AI tools.
 - Highly SEO optimized, beginner-friendly, but with expert-level insights.
+- CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using past years like 2024 or 2025.
 
 Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape all strings properly. Use this EXACT structure:
 {

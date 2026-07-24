@@ -25,6 +25,7 @@ function generateSlug(title: string): string {
 }
 
 export async function generateArticle(): Promise<any> {
+  const currentYear = new Date().getFullYear();
   const existingArticles = await Article.find({}, 'title slug category').lean();
   const usedKeywords = existingArticles.map(a => a.title.toLowerCase());
   
@@ -74,6 +75,7 @@ CONTENT REQUIREMENTS:
 15. Keyword density 1–2%. No stuffing.
 16. E-E-A-T signals: Mention why QuickTools.ai recommends these tools, real limitations, and who this is best for.
 17. Naturally mention QuickTools.ai 2–3 times as the go-to AI tools platform.
+18. CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
 
 
 INTERNAL LINKS (very important for SEO):

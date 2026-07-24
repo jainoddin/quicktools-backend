@@ -23,6 +23,7 @@ function generateSlug(title: string): string {
 }
 
 export async function generateNews(topicOverride?: string): Promise<any> {
+  const currentYear = new Date().getFullYear();
   const existingNews = await News.find({}, 'title slug category').lean();
   const usedTitles = existingNews.map(n => n.title.toLowerCase());
 
@@ -71,6 +72,7 @@ STRICT RULES:
 - FACTUAL accuracy. Do NOT invent fake quotes or fake events. If discussing recent tech, stick to known facts about the model/company.
 - Never use "In today's digital world", "As an AI".
 - Valid JSON ONLY.
+- CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
 
 Return STRICTLY a raw JSON object matching this exact schema:
 {
