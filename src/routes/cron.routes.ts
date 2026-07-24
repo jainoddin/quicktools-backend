@@ -205,4 +205,40 @@ router.post('/generate-news', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/cron/generate-social
+router.post('/generate-social', async (req: Request, res: Response) => {
+  try {
+    const secret = req.headers['x-cron-secret'] || req.body.secret;
+    if (secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    console.log('⏰ Cron job triggered — generating social media post...');
+    
+    // Import dynamically to avoid circular/init issues if any, or just import at top
+    const { generateAndPostToSocialMedia } = await import('../services/socialMediaGenerator');
+    await generateAndPostToSocialMedia();
+
+    res.json({
+      success: true,
+      message: 'Social media post generated and sent to Make.com successfully',
+    });
+  } catch (error) {
+    console.error('❌ Social media generation failed:', error);
+    
+    await sendAdminNotificationEmail(
+      '🚨 CRITICAL: QuickTools Social Media Post Failed!',
+      `<h3>Social Media Post Failed</h3>
+       <p>The automated social media cron job encountered an error:</p>
+       <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${error}</pre>`
+    );
+
+    res.status(500).json({
+      success: false,
+      message: 'Social media generation failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 export default router;
