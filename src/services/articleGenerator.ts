@@ -34,12 +34,16 @@ export async function generateArticle(): Promise<any> {
     !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
   );
 
+  let randomTopic;
   if (availableKeywords.length === 0) {
-    console.log("⚠️ All Article keywords used. Reusing existing keywords pool.");
-    availableKeywords = ARTICLE_KEYWORDS;
+    console.log("⚠️ All predefined Article keywords used. Suggesting a completely fresh topic.");
+    randomTopic = {
+      keyword: "Fresh AI Topic Not In The List",
+      category: "AI & Tools"
+    };
+  } else {
+    randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
   }
-
-  const randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
   const { keyword, category } = randomTopic;
 
   let relatedArticles = existingArticles.filter(a => a.category === category);
@@ -49,18 +53,17 @@ export async function generateArticle(): Promise<any> {
   const shuffledRelated = relatedArticles.sort(() => 0.5 - Math.random()).slice(0, 4);
   const relatedSlugs = shuffledRelated.map(a => a.slug);
 
-
-
   const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for QuickTools.ai — a premium platform for AI tools.
 
-Write a concise, engaging, and high-quality ARTICLE around this keyword:
+Write a concise, engaging, and high-quality ARTICLE around this keyword or generate a completely fresh topic if requested:
 Primary Keyword: ${keyword}
+Previously Used Topics (DO NOT REPEAT THESE): ${usedKeywords.join(', ')}
 
 This article MUST strictly follow ALL of these rules:
 
 CONTENT REQUIREMENTS:
-1. Strong SEO Title (50–60 characters) — keyword at the start.
-2. Meta Description (140–160 characters) — make it compelling and click-worthy.
+1. Strong SEO Title (50–60 characters) — keyword at the start. It MUST be 100% unique from the Previously Used Topics.
+2. Meta Description (140–160 characters) — make it completely unique, compelling, and click-worthy. STRICTLY AVOID generic templates like "A comprehensive guide and review about..." or "Discover the best tools...".
 3. Length: 800–1200 words maximum. Be concise, punchy, and avoid unnecessary filler.
 4. One H1 only (your title). Do NOT repeat it in the content body.
 5. Strong Introduction (H2): State the problem, the solution, and what readers will learn. 100–150 words maximum.
@@ -101,23 +104,21 @@ Return STRICTLY a JSON object matching this EXACT structure:
 {
   "title": "SEO Title (50-60 chars, keyword first)",
   "metaTitle": "Same as title",
-  "metaDescription": "Compelling 140-160 char meta description",
+  "metaDescription": "Unique, non-templated, compelling 140-160 char meta description",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
   "readTime": "10 min read",
   "whatYoullLearn": [
     "Key takeaway 1",
     "Key takeaway 2",
-    "Key takeaway 3",
-    "Key takeaway 4",
-    "Key takeaway 5"
+    "Key takeaway 3"
   ],
-  "content": "Full markdown article body. Start with ## Introduction. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, numbered lists, blockquotes (> text). \nCRUCIAL: You MUST include 4 to 5 inline images throughout the content using this exact markdown format: ![Descriptive Alt Text](https://image.pollinations.ai/prompt/Highly%20detailed%20description%20of%20the%20image%20related%20to%20the%20section%20clean%20modern%20tech%20editorial%20photography?width=800&height=400&nologo=true). Space these images out evenly between major H2 sections. Do NOT include the H1 title here. Do NOT include the FAQ, Pros/Cons or Comparison table — those are separate fields.",
+  "content": "Full markdown article body. Start with ## Introduction. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, blockquotes (> text). \nCRUCIAL: You MUST include 4 inline images throughout the content using this exact markdown format: ![Alt](https://image.pollinations.ai/prompt/Highly%20detailed%20description?width=800&height=400&nologo=true).",
   "tableOfContents": [
     { "id": 1, "title": "Introduction" },
     { "id": 2, "title": "Section Heading" }
   ],
   "prosAndCons": {
-    "pros": ["Pro 1", "Pro 2", "Pro 3", "Pro 4", "Pro 5"],
+    "pros": ["Pro 1", "Pro 2", "Pro 3"],
     "cons": ["Con 1", "Con 2", "Con 3"]
   },
   "comparisonTable": {
@@ -128,16 +129,13 @@ Return STRICTLY a JSON object matching this EXACT structure:
     ]
   },
   "faq": [
-    { "question": "Question 1?", "answer": "Detailed answer 1." },
-    { "question": "Question 2?", "answer": "Detailed answer 2." }
+    { "question": "Question 1?", "answer": "Detailed answer 1." }
   ],
   "internalLinks": [
-    { "anchor": "AI Image Generator", "path": "/tools/ai-image-generator" },
-    { "anchor": "AI Writer", "path": "/tools/ai-writer" }
+    { "anchor": "AI Image", "path": "/tools/ai-image-generator" }
   ],
   "externalLinks": [
-    { "anchor": "OpenAI Official Site", "url": "https://openai.com" },
-    { "anchor": "Google AI", "url": "https://ai.google" }
+    { "anchor": "OpenAI", "url": "https://openai.com" }
   ]
 }`;
 
@@ -148,7 +146,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
       const model = genAI.getGenerativeModel({ 
         model: 'gemini-3-flash-preview',
         generationConfig: {
-          temperature: 0.3, 
+          temperature: 0.7, 
           maxOutputTokens: 8192,
           responseMimeType: 'application/json'
         }
@@ -183,6 +181,8 @@ Return STRICTLY a JSON object matching this EXACT structure:
       title: item.title,
       isActive: index === 0
     }));
+    
+    const randomViews = Math.floor(Math.random() * (75 - 5 + 1) + 5) + (Math.random() > 0.5 ? '.2K' : '.8K');
 
     return {
       slug: generateSlug(parsedContent.title),
@@ -199,7 +199,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
       },
       readTime: parsedContent.readTime || '10 min read',
       publishedAt: new Date(),
-      views: '1.2K views', // Mock initial views
+      views: `${randomViews} views`,
       
       content: parsedContent.content,
       tableOfContents: toc,
