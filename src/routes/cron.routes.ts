@@ -5,6 +5,7 @@ import { News } from '../models/News';
 import { generateBlog } from '../services/gemini.service';
 import { generateArticle } from '../services/articleGenerator';
 import { generateNews } from '../services/newsGenerator';
+import { sendAdminNotificationEmail } from '../services/emailService';
 
 const router = Router();
 
@@ -56,6 +57,16 @@ router.post('/generate-blog', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Blog generation failed:', error);
+    
+    // Send email alert
+    await sendAdminNotificationEmail(
+      '🚨 CRITICAL: QuickTools Blog Generation Failed!',
+      `<h3>Blog Generation Failed</h3>
+       <p>The automated daily blog generation cron job encountered an error:</p>
+       <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${error}</pre>
+       <p>Please check the server logs immediately.</p>`
+    );
+
     res.status(500).json({
       success: false,
       message: 'Blog generation failed',
@@ -107,6 +118,16 @@ router.post('/generate-article', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Article generation failed:', error);
+    
+    // Send email alert
+    await sendAdminNotificationEmail(
+      '🚨 CRITICAL: QuickTools Article Generation Failed!',
+      `<h3>Article Generation Failed</h3>
+       <p>The automated daily article generation cron job encountered an error:</p>
+       <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${error}</pre>
+       <p>Please check the server logs immediately.</p>`
+    );
+
     res.status(500).json({
       success: false,
       message: 'Article generation failed',
@@ -166,6 +187,16 @@ router.post('/generate-news', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ News generation failed:', error);
+    
+    // Send email alert
+    await sendAdminNotificationEmail(
+      '🚨 CRITICAL: QuickTools News Generation Failed!',
+      `<h3>News Generation Failed</h3>
+       <p>The automated daily news generation cron job encountered an error:</p>
+       <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px;">${error}</pre>
+       <p>Please check the server logs immediately.</p>`
+    );
+
     res.status(500).json({
       success: false,
       message: 'News generation failed',

@@ -1,5 +1,7 @@
 import { runWithFailover } from './geminiClient';
 import { Blog } from '../models/Blog';
+import { Subscriber } from '../models/Subscriber';
+import { generateAndUploadImage } from './r2.service';
 
 const SEO_KEYWORDS = [
   { keyword: "Best AI Tools", category: "AI & Tools" },
@@ -154,7 +156,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
     description: generated.description,
     category,
     tags: generated.tags || [],
-    coverImage: `https://image.pollinations.ai/prompt/${encodeURIComponent(generated.title + ' modern 3D illustration professional high quality')}?width=1200&height=800&nologo=true`,
+    coverImage: await generateAndUploadImage(generated.title, 'blog_covers'),
     author: {
       name: 'QuickTools AI',
       avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',

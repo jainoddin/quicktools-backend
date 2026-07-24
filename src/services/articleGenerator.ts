@@ -1,4 +1,5 @@
 import { Article } from '../models/Article';
+import { generateAndUploadImage } from './r2.service';
 import { runWithFailover } from './geminiClient';
 
 const ARTICLE_KEYWORDS = [
@@ -189,7 +190,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
       description: parsedContent.metaDescription, // Use metaDescription as the card description
       category: category,
       tags: parsedContent.tags,
-      coverImage: `https://image.pollinations.ai/prompt/${encodeURIComponent(parsedContent.title + ' clean modern tech editorial photography 8k resolution highly detailed')}?width=1200&height=800&nologo=true&seed=${Math.floor(Math.random() * 100000)}`,
+      coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
       author: {
         name: 'QuickTools AI Team',
         avatar: 'https://ui-avatars.com/api/?name=QuickTools+AI&background=6D5EF8&color=fff',

@@ -1,5 +1,6 @@
 import { News } from '../models/News';
 import { runWithFailover } from './geminiClient';
+import { generateAndUploadImage } from './r2.service';
 
 const NEWS_TOPICS = [
   { topic: "OpenAI Launches GPT-4o Mini with Major Performance Boost", category: "Product Launches", tags: ["OpenAI", "GPT-4o Mini", "AI Models", "Product Launch"] },
@@ -125,9 +126,8 @@ Return STRICTLY a raw JSON object matching this exact schema:
       isBreaking: parsedContent.isBreaking || false,
       summary: parsedContent.summary,
 
-      // Use pollinations for a relevant hero image
-      heroImage: `https://image.pollinations.ai/prompt/${encodeURIComponent(parsedContent.title + ' cinematic technology news editorial photography 8k resolution highly detailed')}?width=1200&height=630&nologo=true&seed=${Math.floor(Math.random() * 100000)}`,
-
+      // Use generateAndUploadImage to upload to R2
+      heroImage: await generateAndUploadImage(parsedContent.title, 'news_covers'),
       author: {
         name: 'QuickTools AI Team',
         avatar: '/icon.svg',
