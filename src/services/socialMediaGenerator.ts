@@ -51,27 +51,22 @@ export async function generateAndPostToSocialMedia() {
 
     const postContent = generatedText.trim();
     
-    // Generate AI Image dynamically
-    // Instagram Graph API is very strict and rejects URLs without .jpg/.png or fm=jpg.
-    // So we use highly reliable premium Unsplash robot/tech images with exact formatting.
-    const roboImages = [
-      'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Robot looking up
-      'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Robot hand
-      'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Circuit board AI
-      'https://images.unsplash.com/photo-1589254065878-42c9da997008?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Robot face
-      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Cute robot
-      'https://images.unsplash.com/photo-1488229297570-58520851e868?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // AI screen
-      'https://images.unsplash.com/photo-1507146426996-ef05306b995a?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max', // Tech puppy dog robot
-      'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=1080&fit=max'  // Abstract AI brain
-    ];
-
-    // Cycle through images using the current day and hour so they NEVER repeat consecutively
     const now = new Date();
-    const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
     const hour = now.getHours();
     
-    const index = (dayOfYear + hour) % roboImages.length;
-    const finalImageUrl = roboImages[index];
+    let folder = 'social_covers';
+    if (hour < 12) {
+      folder = 'article_covers'; // Morning: Article style
+    } else if (hour < 18) {
+      folder = 'blog_covers'; // Afternoon: Blog style
+    } else {
+      folder = 'news_covers'; // Evening: News style
+    }
+    
+    // Import dynamically to avoid top-level issues, or at the top of the file
+    const { generateAndUploadImage } = await import('./r2.service');
+    console.log(`[SocialMedia] Generating dynamic image for ${tool.name} with style ${folder}...`);
+    const finalImageUrl = await generateAndUploadImage(`QuickTools AI: ${tool.name}`, folder);
 
     // 3. Post to Make.com Webhook
     const payload = {
