@@ -120,7 +120,7 @@ Return STRICTLY a raw JSON object matching this exact schema:
 
   const parsedContent = await runWithFailover(async (genAIInstance) => {
       const model = genAIInstance.getGenerativeModel({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-1.5-flash',
         generationConfig: {
           temperature: 0.3, // Lower temperature for more factual, journalistic reporting
           maxOutputTokens: 4096,
