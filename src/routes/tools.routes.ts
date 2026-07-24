@@ -13,53 +13,7 @@ import mongoose from 'mongoose';
 
 const router = Router();
 
-router.get('/fix-seo', async (req: Request, res: Response) => {
-  try {
-    const db = mongoose.connection.db as any;
-    if (!db) {
-      return res.status(500).json({ error: 'Database not connected yet' });
-    }
-    
-    const blogs = await db.collection('blogs').find({ slug: /2024/ }).toArray();
-    const blogRedirects: any[] = [];
-    for (const b of blogs) {
-      const newSlug = b.slug.replace(/2024/g, '2026');
-      await db.collection('blogs').updateOne({ _id: b._id }, { $set: { slug: newSlug } });
-      blogRedirects.push({ source: `/blog/${b.slug}`, destination: `/blog/${newSlug}`, permanent: true });
-    }
 
-    const articles = await db.collection('articles').find({ slug: /2024/ }).toArray();
-    const articleRedirects: any[] = [];
-    for (const a of articles) {
-      const newSlug = a.slug.replace(/2024/g, '2026');
-      await db.collection('articles').updateOne({ _id: a._id }, { $set: { slug: newSlug } });
-      articleRedirects.push({ source: `/article/${a.slug}`, destination: `/article/${newSlug}`, permanent: true });
-    }
-
-    await db.collection('news').updateMany(
-      { slug: { $regex: /ios-18/i } },
-      { $set: { title: 'Apple Intelligence Debuts in iOS 18', date: '2024-06-10T10:00:00Z', isBreaking: false, isLatest: false } }
-    );
-
-    await db.collection('news').updateMany(
-      { slug: { $regex: /llama/i } },
-      { $set: { date: '2024-07-23T10:00:00Z', isBreaking: false, isLatest: false } }
-    );
-
-    const rubins = await db.collection('news').find({ title: { $regex: /Rubin/i } }).sort({ date: -1 }).toArray();
-    if (rubins.length > 1) {
-      const mainRubin = rubins[0];
-      for (let i = 1; i < rubins.length; i++) {
-        await db.collection('news').deleteOne({ _id: rubins[i]._id });
-        blogRedirects.push({ source: `/news/${rubins[i].slug}`, destination: `/news/${mainRubin.slug}`, permanent: true });
-      }
-    }
-
-    res.json({ redirects: [...blogRedirects, ...articleRedirects] });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Rate limiter for image generation to prevent spam/bots
 const imageGenerationLimiter = rateLimit({
