@@ -20,25 +20,39 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
-    let sortConfig: any = { publishedAt: -1 };
+    let sortConfig: any = { publishedAt: -1, _id: 1 };
     if (sort === 'Popular') {
-      sortConfig = { publishedAt: 1 }; // Simple alternate sort for now
+      sortConfig = { publishedAt: 1, _id: 1 }; // Simple alternate sort for now
     }
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [blogs, total] = await Promise.all([
+    const [blogs, total, categoryAgg] = await Promise.all([
       Blog.find(filter)
         .select('-content -tableOfContents -whatYoullLearn -relatedSlugs')
         .sort(sortConfig)
         .skip(skip)
         .limit(Number(limit)),
       Blog.countDocuments(filter),
+      Blog.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } }
+      ])
     ]);
+
+    const categoryCounts: Record<string, number> = {};
+    let totalBlogs = 0;
+    categoryAgg.forEach((c: any) => {
+      if (c._id) {
+        categoryCounts[c._id] = c.count;
+        totalBlogs += c.count;
+      }
+    });
+    categoryCounts['All Blogs'] = totalBlogs;
 
     res.json({
       success: true,
       data: blogs,
+      categoryCounts,
       pagination: {
         total,
         page: Number(page),

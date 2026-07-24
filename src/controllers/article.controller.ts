@@ -16,26 +16,40 @@ export const getArticles = async (req: Request, res: Response) => {
       ];
     }
 
-    let sortConfig: any = { publishedAt: -1 };
+    let sortConfig: any = { publishedAt: -1, _id: 1 };
     if (sort === 'Popular') {
-      sortConfig = { publishedAt: 1 };
+      sortConfig = { publishedAt: 1, _id: 1 };
     }
 
     const limitNum = Math.min(Number(limit), 500); // cap at 500 for sitemap
     const skip = (Number(page) - 1) * limitNum;
     
-    // Fetch articles sorted by latest
-    const articles = await Article.find(query)
-      .sort(sortConfig)
-      .skip(skip)
-      .limit(limitNum)
-      .select('-content -tableOfContents -prosAndCons -comparisonTable -faq -relatedSlugs -internalLinks -externalLinks');
+    const [articles, total, categoryAgg] = await Promise.all([
+      Article.find(query)
+        .sort(sortConfig)
+        .skip(skip)
+        .limit(limitNum)
+        .select('-content -tableOfContents -prosAndCons -comparisonTable -faq -relatedSlugs -internalLinks -externalLinks'),
+      Article.countDocuments(query),
+      Article.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } }
+      ])
+    ]);
 
-    const total = await Article.countDocuments(query);
+    const categoryCounts: Record<string, number> = {};
+    let totalArticles = 0;
+    categoryAgg.forEach((c: any) => {
+      if (c._id) {
+        categoryCounts[c._id] = c.count;
+        totalArticles += c.count;
+      }
+    });
+    categoryCounts['All Articles'] = totalArticles;
 
     res.status(200).json({
       success: true,
       data: articles,
+      categoryCounts,
       pagination: {
         total,
         page: Number(page),

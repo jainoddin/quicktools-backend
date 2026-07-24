@@ -20,25 +20,39 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
-    let sortConfig: any = { publishedAt: -1 };
+    let sortConfig: any = { publishedAt: -1, _id: 1 };
     if (sort === 'Popular') {
-      sortConfig = { publishedAt: 1 };
+      sortConfig = { publishedAt: 1, _id: 1 };
     }
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [newsItems, total] = await Promise.all([
+    const [newsItems, total, categoryAgg] = await Promise.all([
       News.find(filter)
         .select('-whatHappened -whyItMatters -industryReaction -quickToolsInsight -conclusion -keyHighlights -relatedSlugs')
         .sort(sortConfig)
         .skip(skip)
         .limit(Number(limit)),
       News.countDocuments(filter),
+      News.aggregate([
+        { $group: { _id: "$category", count: { $sum: 1 } } }
+      ])
     ]);
+
+    const categoryCounts: Record<string, number> = {};
+    let totalNews = 0;
+    categoryAgg.forEach((c: any) => {
+      if (c._id) {
+        categoryCounts[c._id] = c.count;
+        totalNews += c.count;
+      }
+    });
+    categoryCounts['All News'] = totalNews;
 
     res.json({
       success: true,
       data: newsItems,
+      categoryCounts,
       pagination: {
         total,
         page: Number(page),
