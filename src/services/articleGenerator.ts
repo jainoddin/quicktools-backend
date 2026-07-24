@@ -27,24 +27,27 @@ function generateSlug(title: string): string {
 
 import fs from 'fs';
 import path from 'path';
-
-let isGenerating = false;
+import { CronLock } from '../models/CronLock';
 
 export async function generateArticle(): Promise<any> {
-  if (isGenerating) {
+  try {
+    await CronLock.create({ key: 'article_generator' });
+  } catch (error) {
     console.log("⚠️ Article generation is already in progress. Skipping to prevent duplicates.");
-    throw new Error('Generation already in progress (lock active)');
+    throw new Error('Generation already in progress (DB lock active)');
   }
-  isGenerating = true;
 
   try {
     const currentYear = new Date().getFullYear();
     const existingArticles = await Article.find({}, 'title slug category').lean();
     const usedKeywords = existingArticles.map(a => a.title.toLowerCase());
     
-    let availableKeywords = ARTICLE_KEYWORDS.filter(k => 
-      !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
-    );
+    let availableKeywords = ARTICLE_KEYWORDS.filter(k => {
+      const topicKeywords = k.keyword.toLowerCase().split(' ').filter(w => w.length > 3);
+      return !usedKeywords.some(used => 
+        topicKeywords.filter(kw => used.includes(kw)).length >= 2
+      );
+    });
 
     let randomTopic;
     if (availableKeywords.length === 0) {
@@ -230,8 +233,17 @@ Return STRICTLY a JSON object matching this EXACT structure:
 
     } catch (error) {
       console.error("AI Article Generation Error:", error);
+      try {
+        if (typeof jsonString !== 'undefined') {
+          require('fs').writeFileSync('debug_json.json', jsonString);
+          console.log('Saved debug_json.json for troubleshooting.');
+        }
+      } catch (e) {
+        console.error('Failed to save debug JSON:', e);
+      }
       throw error;
     }
   } finally {
-    isGenerating = false;
+    await CronLock.deleteOne({ key: 'article_generator' });
   }
+}

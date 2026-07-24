@@ -25,14 +25,15 @@ function generateSlug(title: string): string {
     .trim();
 }
 
-let isGenerating = false;
+import { CronLock } from '../models/CronLock';
 
 export async function generateNews(topicOverride?: string): Promise<any> {
-  if (isGenerating) {
+  try {
+    await CronLock.create({ key: 'news_generator' });
+  } catch (error) {
     console.log("⚠️ News generation is already in progress. Skipping to prevent duplicates.");
-    throw new Error('Generation already in progress (lock active)');
+    throw new Error('Generation already in progress (DB lock active)');
   }
-  isGenerating = true;
 
   try {
     const currentYear = new Date().getFullYear();
@@ -117,8 +118,7 @@ Return STRICTLY a raw JSON object matching this exact schema:
   "conclusion": "Markdown formatted short conclusion..."
 }`;
 
-  try {
-    const parsedContent = await runWithFailover(async (genAIInstance) => {
+  const parsedContent = await runWithFailover(async (genAIInstance) => {
       const model = genAIInstance.getGenerativeModel({
         model: 'gemini-3-flash-preview',
         generationConfig: {
@@ -176,6 +176,6 @@ Return STRICTLY a raw JSON object matching this exact schema:
     console.error("AI News Generation Error:", error);
     throw error;
   } finally {
-    isGenerating = false;
+    await CronLock.deleteOne({ key: 'news_generator' });
   }
 }
