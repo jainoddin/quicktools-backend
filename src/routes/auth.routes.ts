@@ -142,6 +142,9 @@ router.get('/me', async (req: Request, res: Response) => {
         savedNews: user.savedNews || [],
         credits: user.credits || 0,
         plan: user.plan || 'free',
+        createdAt: user.createdAt,
+        freeGenerationsCount: user.freeGenerationsCount || 0,
+        lastGenerationDate: user.lastGenerationDate,
       }
     });
 

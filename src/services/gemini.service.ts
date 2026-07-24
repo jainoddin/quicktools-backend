@@ -112,7 +112,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
   try {
     text = await runWithFailover(async (genAI) => {
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-1.5-flash',
         generationConfig: {
           temperature: 0.7, 
           maxOutputTokens: 8192,

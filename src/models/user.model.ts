@@ -14,6 +14,8 @@ export interface IUser extends Document {
   favoriteImages: any[];
   credits: number;
   plan: string;
+  freeGenerationsCount: number;
+  lastGenerationDate: Date;
   bio?: string;
   customAvatar?: boolean;
   /** When set, account is deactivated. Login within 15 days reactivates; after 15 days it is permanently deleted. */
@@ -36,8 +38,10 @@ const UserSchema: Schema = new Schema(
     savedArticles: { type: [String], default: [] },
     savedNews: { type: [String], default: [] },
     favoriteImages: { type: [Object], default: [] },
-    credits: { type: Number, default: 15 },
+    credits: { type: Number, default: 0 },
     plan: { type: String, default: 'free', enum: ['free', 'starter', 'pro', 'business'] },
+    freeGenerationsCount: { type: Number, default: 0 },
+    lastGenerationDate: { type: Date, default: Date.now },
     bio: { type: String, default: '' },
     customAvatar: { type: Boolean, default: false },
     deactivatedAt: { type: Date, default: null },

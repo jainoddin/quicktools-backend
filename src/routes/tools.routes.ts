@@ -160,9 +160,10 @@ router.post('/generate-text', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      data: text,
-      creditsRemaining: user ? user.credits : 'Guest',
-      usageId
+      data: { text },
+      text, // For compatibility
+      usageId,
+      creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
     console.error('❌ Text generation failed:', error);
@@ -210,12 +211,14 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
 
     // Optional auth — if logged in, use credit system
     const token = req.cookies?.token;
+    let usageId = null;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         const user = await User.findById(decoded.id);
         
         if (user) {
+          (req as any).user = user; // Attach user to req for saveFreeToolUsage
           const creditsNeeded = 5;
           if (user.credits < creditsNeeded) {
             return res.status(403).json({ 
@@ -227,14 +230,7 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
           // Deduct credits
           user.credits -= creditsNeeded;
           await user.save();
-          await ToolUsage.create({
-            userId: user._id,
-            toolSlug: '/tools/ai-image-generator',
-            toolName: 'AI Image Generator',
-            prompt: prompt.substring(0, 500),
-            result: imageUrl,
-            creditsUsed: creditsNeeded,
-          });
+          usageId = await saveFreeToolUsage(req, '/tools/ai-image-generator', 'AI Image Generator', prompt, imageUrl);
         }
       } catch (authErr) {
         // Token invalid — treat as guest (IP rate limit protects us)
@@ -255,7 +251,8 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
 
     res.json({
       success: true,
-      data: imageUrl
+      data: imageUrl,
+      usageId
     });
   } catch (error) {
     console.error('❌ Image generation failed:', error);
@@ -371,7 +368,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
         user.credits -= creditsNeeded;
         await user.save();
 
-        await ToolUsage.create({
+        const usage = await ToolUsage.create({
           userId: user._id,
           toolSlug: '/tools/ai-code',
           toolName: 'AI Code Generator',
@@ -384,6 +381,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
           }),
           creditsUsed: creditsNeeded,
         });
+        usageId = usage._id;
       } catch (dbError) {
         console.warn('⚠️ MongoDB error during credit deduction, bypassing:', dbError);
       }
@@ -392,6 +390,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: generatedCode,
+      usageId,
       creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
@@ -474,7 +473,7 @@ router.post('/generate-video', async (req: Request, res: Response) => {
       user.credits -= creditsNeeded;
       await user.save();
 
-      await ToolUsage.create({
+      const usage = await ToolUsage.create({
         userId: user._id,
         toolSlug: '/tools/ai-video-generator',
         toolName: 'AI Video Generator',
@@ -482,11 +481,13 @@ router.post('/generate-video', async (req: Request, res: Response) => {
         result: JSON.stringify(resultData),
         creditsUsed: creditsNeeded,
       });
+      usageId = usage._id;
     }
 
     res.json({
       success: true,
       data: resultData,
+      usageId,
       creditsRemaining: user ? user.credits : 'Guest'
     });
   } catch (error) {
@@ -559,8 +560,8 @@ router.post('/summarize', async (req: Request, res: Response) => {
     const prompt = `Please summarize the following text into clear bullet points. Keep it concise and easy to understand.\n\nText:\n${text}`;
     const summary = await generateToolText({ prompt, contentType: 'Summary', tone: 'Professional', language: 'English', creativity: 3 });
 
-    await saveFreeToolUsage(req, '/tools/ai-summarizer', 'AI Text Summarizer', text, summary);
-    res.json({ success: true, text: summary });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-summarizer', 'AI Text Summarizer', text, summary);
+    res.json({ success: true, text: summary, usageId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to summarize text' });
@@ -576,8 +577,8 @@ router.post('/translate', async (req: Request, res: Response) => {
     const prompt = `Translate the following text into ${targetLanguage}. Provide only the translation, no extra text.\n\nText:\n${text}`;
     const translation = await generateToolText({ prompt, contentType: 'Translation', tone: 'Neutral', language: targetLanguage, creativity: 1 });
 
-    await saveFreeToolUsage(req, '/tools/ai-translator', 'AI Language Translator', `Translate to ${targetLanguage}: ${text}`, translation);
-    res.json({ success: true, text: translation });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-translator', 'AI Language Translator', `Translate to ${targetLanguage}: ${text}`, translation);
+    res.json({ success: true, text: translation, usageId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to translate text' });
@@ -593,8 +594,8 @@ router.post('/resume', async (req: Request, res: Response) => {
     const prompt = `Act as an expert Resume Writer. Create a professional, ATS-friendly resume based on the following details. Format the output nicely in Markdown.\n\nDetails:\n${details}`;
     const resume = await generateToolText({ prompt, contentType: 'Resume', tone: 'Professional', language: 'English', creativity: 4 });
 
-    await saveFreeToolUsage(req, '/tools/ai-resume-builder', 'AI Resume Builder', details, resume);
-    res.json({ success: true, text: resume });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-resume-builder', 'AI Resume Builder', details, resume);
+    res.json({ success: true, text: resume, usageId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to generate resume' });
@@ -616,8 +617,8 @@ Format as a JSON array of objects, e.g. [{"hex": "#FFFFFF", "name": "Pure White"
     // Clean JSON if needed
     paletteText = paletteText.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    await saveFreeToolUsage(req, '/tools/ai-color-palette', 'AI Color Palette', description, paletteText);
-    res.json({ success: true, palette: JSON.parse(paletteText) });
+    const usageId = await saveFreeToolUsage(req, '/tools/ai-color-palette', 'AI Color Palette', description, paletteText);
+    res.json({ success: true, palette: JSON.parse(paletteText), usageId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to generate color palette' });
@@ -634,9 +635,9 @@ router.post('/shorten', async (req: Request, res: Response) => {
     const newUrl = await ShortUrl.create({ originalUrl: url, shortCode });
 
     const shortLink = `/s/${shortCode}`;
-    await saveFreeToolUsage(req, '/tools/url-shortener', 'URL Shortener', url, shortLink);
+    const usageId = await saveFreeToolUsage(req, '/tools/url-shortener', 'URL Shortener', url, shortLink);
     
-    res.json({ success: true, shortCode, originalUrl: url });
+    res.json({ success: true, shortCode, originalUrl: url, usageId });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to shorten URL' });
@@ -1056,7 +1057,16 @@ router.post('/poem-generator', async (req: Request, res: Response) => {
     if (!input) return res.status(400).json({ success: false, message: 'Input is required' });
     const prompt = `Act as a Master Poet. Write a beautiful, evocative, and creative poem based on this topic and style: "${input}". Use strong imagery and emotional resonance. Format in markdown.`;
     const result = await generateToolText({ prompt, contentType: 'AI Poem Generator', tone: 'Professional', language: 'English', creativity: 7 });
-    const usageId = await saveFreeToolUsage(req, '/tools/ai-poem-generator', 'AI Poem Generator', input, result);
+    
+    let usageId = null;
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        usageId = await saveFreeToolUsage(req, '/tools/ai-poem-generator', 'AI Poem Generator', input, result);
+      } catch (err) {}
+    }
+    
     res.json({ success: true, text: result, usageId });
   } catch (error) { res.status(500).json({ success: false, message: 'Failed to generate content' }); }
 });

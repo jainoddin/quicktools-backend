@@ -70,7 +70,7 @@ router.get('/usage', authenticate, async (req: Request, res: Response) => {
     const creditsUsedThisPeriod = usageAgg.length > 0 ? usageAgg[0].totalCreditsUsed : 0;
     
     // We can define total credits per plan
-    const baseMax = user.plan === 'business' ? 100000 : user.plan === 'pro' ? 10000 : user.plan === 'starter' ? 500 : 15;
+    const baseMax = user.plan === 'business' ? 18000 : user.plan === 'pro' ? 14400 : user.plan === 'starter' ? 500 : 0;
     const maxCredits = Math.max(baseMax, user.credits + creditsUsedThisPeriod);
 
     res.json({
@@ -80,6 +80,8 @@ router.get('/usage', authenticate, async (req: Request, res: Response) => {
         creditsUsedThisPeriod, // This will be used in UI based on selected timeframe
         maxCredits,
         plan: user.plan,
+        freeGenerationsCount: user.freeGenerationsCount || 0,
+        lastGenerationDate: user.lastGenerationDate || new Date(),
         history
       }
     });

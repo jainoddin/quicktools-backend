@@ -15,18 +15,18 @@ const NEWS_TOPICS = [
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
-    .replace(/&/g, 'and')          
-    .replace(/[^a-z0-9\s-]/g, '') 
-    .replace(/\s+/g, '-')         
-    .replace(/-+/g, '-')          
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
     .trim();
 }
 
 export async function generateNews(topicOverride?: string): Promise<any> {
   const existingNews = await News.find({}, 'title slug category').lean();
   const usedTitles = existingNews.map(n => n.title.toLowerCase());
-  
-  let availableTopics = NEWS_TOPICS.filter(t => 
+
+  let availableTopics = NEWS_TOPICS.filter(t =>
     !usedTitles.some(used => used.includes(t.topic.toLowerCase()))
   );
 
@@ -94,7 +94,7 @@ Return STRICTLY a raw JSON object matching this exact schema:
 
   try {
     const parsedContent = await runWithFailover(async (genAIInstance) => {
-      const model = genAIInstance.getGenerativeModel({ 
+      const model = genAIInstance.getGenerativeModel({
         model: 'gemini-3-flash-preview',
         generationConfig: {
           temperature: 0.3, // Lower temperature for more factual, journalistic reporting
@@ -122,28 +122,28 @@ Return STRICTLY a raw JSON object matching this exact schema:
       title: parsedContent.title,
       isBreaking: parsedContent.isBreaking || false,
       summary: parsedContent.summary,
-      
+
       // Use pollinations for a relevant hero image
       heroImage: `https://image.pollinations.ai/prompt/${encodeURIComponent(parsedContent.title + ' cinematic technology news editorial photography 8k resolution highly detailed')}?width=1200&height=630&nologo=true&seed=${Math.floor(Math.random() * 100000)}`,
-      
+
       author: {
         name: 'QuickTools AI Team',
         avatar: '/icon.svg',
       },
       publishedAt: new Date(),
       readTime: parsedContent.readTime || '3 min read',
-      
+
       whatHappened: parsedContent.whatHappened,
       whyItMatters: parsedContent.whyItMatters,
       keyHighlights: parsedContent.keyHighlights || [],
       industryReaction: parsedContent.industryReaction,
       quickToolsInsight: parsedContent.quickToolsInsight,
       conclusion: parsedContent.conclusion,
-      
+
       relatedSlugs: relatedSlugs,
       tags: tags,
       category: category,
-      
+
       metaTitle: parsedContent.metaTitle || parsedContent.title,
       metaDescription: parsedContent.metaDescription || parsedContent.summary
     };

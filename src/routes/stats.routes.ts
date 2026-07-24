@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
       data: {
         users: userCount,
         tasks: tasksCompleted,
-        tools: 5, // Currently there are 5 AI tools available
+        tools: 111, // Currently there are 111 AI tools available
         countries: 150, // Approximation for a global SaaS
         uptime: 99.9, // Standard SLA
       }
