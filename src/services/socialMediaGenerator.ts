@@ -1,23 +1,20 @@
 import { runWithFailover } from './geminiClient';
 import fetch from 'node-fetch';
 
-// List of available tools to pick from
-const toolsList = [
-  { name: 'AI Resume Builder', url: 'https://quicktools.space/tools/ai-resume-builder' },
-  { name: 'AI Image Generator', url: 'https://quicktools.space/tools/ai-image-generator' },
-  { name: 'Background Remover', url: 'https://quicktools.space/tools/background-remover' },
-  { name: 'AI Grammar Checker', url: 'https://quicktools.space/tools/ai-grammar-checker' },
-  { name: 'AI Video Generator', url: 'https://quicktools.space/tools/ai-video-generator' },
-  { name: 'AI Business Name Generator', url: 'https://quicktools.space/tools/ai-business-name-generator' },
-  { name: 'AI Presentation Generator', url: 'https://quicktools.space/tools/ai-presentation-generator' },
-  { name: 'AI Logo Maker', url: 'https://quicktools.space/tools/ai-logo-maker' },
-  { name: 'Code Explainer', url: 'https://quicktools.space/tools/ai-code-explainer' },
-  { name: 'SQL Query Generator', url: 'https://quicktools.space/tools/ai-sql-generator' }
-];
+import fs from 'fs';
+import path from 'path';
+
+// Read all 111 tools from the JSON file
+const toolsDataPath = path.join(__dirname, '../../tools_data.json');
+const toolsListRaw = JSON.parse(fs.readFileSync(toolsDataPath, 'utf8'));
+const toolsList = toolsListRaw.map((t: any) => ({
+  name: t.name,
+  url: `https://quicktool.space/tools/${t.slug}`
+}));
 
 export async function generateAndPostToSocialMedia() {
   try {
-    const makeWebhookUrl = 'https://hook.eu1.make.com/ljr6ps4bje9d78zndivnahh0w5eaqk49';
+    const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL || 'https://hook.eu1.make.com/ljr6ps4bje9d78zndivnahh0w5eaqk49';
 
     // 1. Pick a random tool
     const tool = toolsList[Math.floor(Math.random() * toolsList.length)];
@@ -39,6 +36,7 @@ export async function generateAndPostToSocialMedia() {
       - Include 3-6 relevant, trending hashtags.
       - Include this exact link at the very end of the post text: ${tool.url}
       - Keep it engaging and professional.
+      - MAXIMUM LENGTH: The ENTIRE text including link and hashtags MUST be under 280 characters to fit on Twitter/X.
       
       Return ONLY the text of the post. Do not include any JSON, quotes, or markdown formatting blocks.
     `;
