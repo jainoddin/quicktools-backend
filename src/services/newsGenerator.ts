@@ -3,14 +3,16 @@ import { runWithFailover } from './geminiClient';
 import { generateAndUploadImage } from './r2.service';
 
 const NEWS_TOPICS = [
-  { topic: "OpenAI Launches GPT-4o Mini with Major Performance Boost", category: "Product Launches", tags: ["OpenAI", "GPT-4o Mini", "AI Models", "Product Launch"] },
-  { topic: "Google Gemini 1.5 Pro Gets Context Window Upgrade", category: "Product Launches", tags: ["Google", "Gemini", "AI Models", "Product Update"] },
-  { topic: "Anthropic Raises $4B in Series E Funding Round", category: "Funding", tags: ["Anthropic", "Funding", "Business"] },
-  { topic: "Microsoft Integrates AI Copilot in All Office 365 Apps", category: "Partnerships", tags: ["Microsoft", "Copilot", "Integration", "Productivity"] },
-  { topic: "Meta Unveils Llama 3.1: Better Performance, Lower Cost", category: "Research", tags: ["Meta", "Llama 3", "Open Source", "Research"] },
-  { topic: "NVIDIA Unveils Next-Gen AI Chips for 2026", category: "Industry", tags: ["NVIDIA", "Hardware", "Chips", "Industry"] },
-  { topic: "EU Passes Comprehensive AI Regulation Act", category: "Regulation", tags: ["EU", "Regulation", "AI Ethics", "Law"] },
-  { topic: "Apple Intelligence Debuts in iOS 18", category: "Product Launches", tags: ["Apple", "Apple Intelligence", "iOS", "Mobile AI"] }
+  { topic: "OpenAI Launches GPT-6 with Native Video Reasoning", category: "Product Launches", tags: ["OpenAI", "GPT-6", "AI Models", "Product Launch"] },
+  { topic: "Google Gemini 3.0 Achieves AGI Benchmarks", category: "Product Launches", tags: ["Google", "Gemini 3", "AI Models", "AGI"] },
+  { topic: "Anthropic Claude 4 Introduces Real-time Action Agents", category: "Product Launches", tags: ["Anthropic", "Claude 4", "Agents"] },
+  { topic: "Microsoft Unveils Windows 13 with Deep AI OS Integration", category: "Partnerships", tags: ["Microsoft", "Windows", "Integration", "OS"] },
+  { topic: "Meta Unveils Llama 4: Open Source Meets Trillion Parameters", category: "Research", tags: ["Meta", "Llama 4", "Open Source", "Research"] },
+  { topic: "NVIDIA Announces Blackwell 2.0 Chips with Quantum Enhancements", category: "Industry", tags: ["NVIDIA", "Hardware", "Chips", "Quantum"] },
+  { topic: "Global AI Treaty Signed for Autonomous Systems Regulation", category: "Regulation", tags: ["Global", "Regulation", "AI Ethics", "Treaty"] },
+  { topic: "Apple Intelligence 2.0 Debuts in iOS 20 with Holographic UI", category: "Product Launches", tags: ["Apple", "Apple Intelligence 2.0", "iOS", "Mobile AI"] },
+  { topic: "Tesla Optimus Gen 3 Enters Mass Production", category: "Robotics", tags: ["Tesla", "Robotics", "Hardware"] },
+  { topic: "Midjourney v8 Generates Interactive 3D Worlds", category: "Product Launches", tags: ["Midjourney", "AI Art", "3D Generation"] }
 ];
 
 function generateSlug(title: string): string {
@@ -23,21 +25,39 @@ function generateSlug(title: string): string {
     .trim();
 }
 
+let isGenerating = false;
+
 export async function generateNews(topicOverride?: string): Promise<any> {
-  const currentYear = new Date().getFullYear();
-  const existingNews = await News.find({}, 'title slug category').lean();
+  if (isGenerating) {
+    console.log("⚠️ News generation is already in progress. Skipping to prevent duplicates.");
+    throw new Error('Generation already in progress (lock active)');
+  }
+  isGenerating = true;
+
+  try {
+    const currentYear = new Date().getFullYear();
+    const existingNews = await News.find({}, 'title slug category').lean();
   const usedTitles = existingNews.map(n => n.title.toLowerCase());
 
-  let availableTopics = NEWS_TOPICS.filter(t =>
-    !usedTitles.some(used => used.includes(t.topic.toLowerCase()))
-  );
+  let availableTopics = NEWS_TOPICS.filter(t => {
+    const topicKeywords = t.topic.toLowerCase().split(' ').filter(w => w.length > 3);
+    return !usedTitles.some(used => 
+      topicKeywords.filter(kw => used.includes(kw)).length >= 2 // if 2+ significant words match, consider it a duplicate
+    );
+  });
 
+  let randomTopic;
   if (availableTopics.length === 0) {
-    console.log("⚠️ All predefined News topics used. Reusing existing pool.");
-    availableTopics = NEWS_TOPICS;
+    console.log("⚠️ All predefined News topics used. Requesting completely fresh 2026 news topic.");
+    randomTopic = {
+      topic: "Fresh AI Industry Breaking News (Invent a realistic 2026 event)",
+      category: "Industry",
+      tags: ["AI", "2026", "Update"]
+    };
+  } else {
+    randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
   }
 
-  const randomTopic = availableTopics[Math.floor(Math.random() * availableTopics.length)];
   const topicToGenerate = topicOverride || randomTopic.topic;
   const category = topicOverride ? 'AI News' : randomTopic.category;
   const tags = topicOverride ? ['AI', 'News', 'Update'] : randomTopic.tags;
@@ -50,37 +70,39 @@ export async function generateNews(topicOverride?: string): Promise<any> {
   const shuffledRelated = relatedNews.sort(() => 0.5 - Math.random()).slice(0, 4);
   const relatedSlugs = shuffledRelated.map(n => n.slug);
 
-  const prompt = `You are a Professional Tech Journalist reporting for QuickTools.ai News.
+  const prompt = `You are a Professional Tech Journalist reporting for QuickTools.ai News in the year ${currentYear}.
 
-Write a factual, engaging, and professional News Article around this topic/event:
+Write a factual, engaging, and professional News Article around this topic/event or generate a completely fresh news topic if requested:
 Topic: ${topicToGenerate}
+Previously Used Titles (DO NOT REPEAT THESE TOPICS/THEMES): ${usedTitles.join(', ')}
 
 This news page MUST strictly follow ALL of these rules:
 
 CONTENT REQUIREMENTS:
-1. Strong News Title (50–60 characters).
+1. Strong News Title (50–60 characters). It MUST perfectly match the content body and be 100% unique from Previously Used Titles.
 2. Short Summary ("In Short"): 2-3 lines explaining the complete news concisely.
 3. Length: 700–1200 words. Neutral, journalistic tone. No fluff.
-4. "What Happened?": Detailed explanation of the news event.
+4. "What Happened?": Detailed explanation of the news event. The event details MUST exactly match the headline!
 5. "Key Highlights": Array of 3-5 short, impactful bullet points.
 6. "Why It Matters": Explain the impact on users, businesses, or the industry.
-7. "Industry Reaction": Mention official announcements, quotes, or public reactions (use factual knowledge up to your training cutoff).
+7. "Industry Reaction": Mention official announcements, quotes, or public reactions.
 8. "QuickTools Insight": 2-3 lines of insight. Example: "If you're comparing AI models, our AI Tools directory can help you explore available options."
 9. "Conclusion": Short summary of what's next.
 
 STRICT RULES:
 - Neutral reporting.
-- FACTUAL accuracy. Do NOT invent fake quotes or fake events. If discussing recent tech, stick to known facts about the model/company.
+- CRUCIAL FUTURE CONTEXT: You are reporting in the year ${currentYear}. DO NOT write about old 2024 events (like GPT-4o mini, Llama 3.1, or the original 2024 EU AI Act) and pretend they are breaking news today. Instead, invent plausible, highly realistic new product launches (e.g. GPT-6, Claude 4, new regulations) that fit the year ${currentYear}.
+- FACTUAL consistency. The headline and the body MUST be about the exact same event. Do NOT put "GPT-6" in the title and talk about "GPT-4o mini" in the body.
 - Never use "In today's digital world", "As an AI".
 - Valid JSON ONLY.
-- CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
+- CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned. STRICTLY avoid using 2024 or 2025.
 
 Return STRICTLY a raw JSON object matching this exact schema:
 {
   "title": "News Title",
   "metaTitle": "News Title - QuickTools AI",
   "metaDescription": "140-160 char meta description",
-  "isBreaking": true,
+  "isBreaking": false, // Set to true ONLY if this is genuinely major, urgent industry news (e.g. massive product launch, regulation). Most articles should be false.
   "summary": "2-3 lines complete news summary.",
   "readTime": "3 min read",
   "whatHappened": "Markdown formatted explanation of what happened...",
@@ -153,5 +175,7 @@ Return STRICTLY a raw JSON object matching this exact schema:
   } catch (error) {
     console.error("AI News Generation Error:", error);
     throw error;
+  } finally {
+    isGenerating = false;
   }
 }

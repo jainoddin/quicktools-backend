@@ -25,35 +25,57 @@ function generateSlug(title: string): string {
     .trim();
 }
 
+import fs from 'fs';
+import path from 'path';
+
+let isGenerating = false;
+
 export async function generateArticle(): Promise<any> {
-  const currentYear = new Date().getFullYear();
-  const existingArticles = await Article.find({}, 'title slug category').lean();
-  const usedKeywords = existingArticles.map(a => a.title.toLowerCase());
-  
-  let availableKeywords = ARTICLE_KEYWORDS.filter(k => 
-    !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
-  );
-
-  let randomTopic;
-  if (availableKeywords.length === 0) {
-    console.log("⚠️ All predefined Article keywords used. Suggesting a completely fresh topic.");
-    randomTopic = {
-      keyword: "Fresh AI Topic Not In The List",
-      category: "AI & Tools"
-    };
-  } else {
-    randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+  if (isGenerating) {
+    console.log("⚠️ Article generation is already in progress. Skipping to prevent duplicates.");
+    throw new Error('Generation already in progress (lock active)');
   }
-  const { keyword, category } = randomTopic;
+  isGenerating = true;
 
-  let relatedArticles = existingArticles.filter(a => a.category === category);
-  if (relatedArticles.length < 3) {
-    relatedArticles = existingArticles; // fallback
-  }
-  const shuffledRelated = relatedArticles.sort(() => 0.5 - Math.random()).slice(0, 4);
-  const relatedSlugs = shuffledRelated.map(a => a.slug);
+  try {
+    const currentYear = new Date().getFullYear();
+    const existingArticles = await Article.find({}, 'title slug category').lean();
+    const usedKeywords = existingArticles.map(a => a.title.toLowerCase());
+    
+    let availableKeywords = ARTICLE_KEYWORDS.filter(k => 
+      !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
+    );
 
-  const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for QuickTools.ai — a premium platform for AI tools.
+    let randomTopic;
+    if (availableKeywords.length === 0) {
+      console.log("⚠️ All predefined Article keywords used. Suggesting a completely fresh topic.");
+      randomTopic = {
+        keyword: "Fresh AI Topic Not In The List",
+        category: "AI & Tools"
+      };
+    } else {
+      randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+    }
+    const { keyword, category } = randomTopic;
+
+    let relatedArticles = existingArticles.filter(a => a.category === category);
+    if (relatedArticles.length < 3) {
+      relatedArticles = existingArticles; // fallback
+    }
+    const shuffledRelated = relatedArticles.sort(() => 0.5 - Math.random()).slice(0, 4);
+    const relatedSlugs = shuffledRelated.map(a => a.slug);
+
+    // Read real tools for internal links
+    let realToolsContext = "";
+    try {
+      const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
+      const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
+      realToolsContext = sampleTools.map((t: any) => `- ${t.url} (Anchor: ${t.name})`).join('\\n');
+    } catch (e) {
+      console.error("Could not load tools_data.json for internal links", e);
+    }
+
+    const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for QuickTools.ai — a premium platform for AI tools.
 
 Write a concise, engaging, and high-quality ARTICLE around this keyword or generate a completely fresh topic if requested:
 Primary Keyword: ${keyword}
@@ -83,13 +105,10 @@ CONTENT REQUIREMENTS:
 
 
 INTERNAL LINKS (very important for SEO):
-Suggest 5–8 internal link anchor texts + their QuickTools.ai paths. Use realistic paths like:
-- /tools/ai-image-generator
-- /tools/ai-writer  
-- /tools/ai-chat-assistant
-- /articles/best-ai-seo-tools
-- /blog/chatgpt-guide
-Include these as a separate JSON field called "internalLinks".
+Suggest 5–8 internal link anchor texts + their QuickTools.ai paths. 
+CRUCIAL: You MUST ONLY select links from the following list of REAL tools on our platform. Do NOT invent fake URLs:
+${realToolsContext}
+Include these as a separate JSON field called "internalLinks" where "path" is the tool URL.
 
 EXTERNAL LINKS:
 Suggest 3–5 authoritative external links. Use ONLY official sites like openai.com, anthropic.com, ai.google, github.com/features/copilot.
@@ -139,94 +158,80 @@ Return STRICTLY a JSON object matching this EXACT structure:
   ]
 }`;
 
-
-  let jsonString: string | undefined = undefined;
-  try {
-    let rawText = await runWithFailover(async (genAI: any) => {
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-3-flash-preview',
-        generationConfig: {
-          temperature: 0.7, 
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json'
-        }
-      });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    });
-    
-    // Extract JSON block using regex to bypass backticks or external conversational wrappers
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('--- GEMINI RAW RESPONSE FAILED TO MATCH JSON ---');
-      console.error(rawText);
-      throw new Error('No valid JSON found in Gemini response');
-    }
-
-    jsonString = jsonMatch[0];
-
-    // Escape literal control characters inside JSON string values to prevent JSON parse errors
-    jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
-      return match
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-    });
-
-    const parsedContent = JSON.parse(jsonString);
-
-    // Ensure the table of contents has active states
-    const toc = parsedContent.tableOfContents.map((item: any, index: number) => ({
-      id: index + 1,
-      title: item.title,
-      isActive: index === 0
-    }));
-    
-    const randomViews = Math.floor(Math.random() * (75 - 5 + 1) + 5) + (Math.random() > 0.5 ? '.2K' : '.8K');
-
-    return {
-      slug: generateSlug(parsedContent.title),
-      title: parsedContent.title,
-      description: parsedContent.metaDescription, // Use metaDescription as the card description
-      category: category,
-      tags: parsedContent.tags,
-      coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
-      author: {
-        name: 'QuickTools AI Team',
-        avatar: 'https://ui-avatars.com/api/?name=QuickTools+AI&background=6D5EF8&color=fff',
-        isVerified: true,
-        bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
-      },
-      readTime: parsedContent.readTime || '10 min read',
-      publishedAt: new Date(),
-      views: `${randomViews} views`,
-      
-      content: parsedContent.content,
-      tableOfContents: toc,
-      whatYoullLearn: parsedContent.whatYoullLearn || [],
-      
-      prosAndCons: parsedContent.prosAndCons || { pros: [], cons: [] },
-      comparisonTable: parsedContent.comparisonTable || { headers: [], rows: [] },
-      faq: parsedContent.faq || [],
-      
-      relatedSlugs: relatedSlugs,
-      internalLinks: parsedContent.internalLinks || [],
-      externalLinks: parsedContent.externalLinks || [],
-      
-      metaTitle: parsedContent.metaTitle,
-      metaDescription: parsedContent.metaDescription
-    };
-
-  } catch (error) {
-    console.error("AI Article Generation Error:", error);
+    let jsonString: string | undefined = undefined;
     try {
-      if (typeof jsonString !== 'undefined') {
-        require('fs').writeFileSync('debug_json.json', jsonString);
-        console.log('Saved debug_json.json for troubleshooting.');
+      let rawText = await runWithFailover(async (genAI: any) => {
+        const model = genAI.getGenerativeModel({ 
+          model: 'gemini-3-flash-preview',
+          generationConfig: {
+            temperature: 0.7, 
+            maxOutputTokens: 8192,
+            responseMimeType: 'application/json'
+          }
+        });
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+      });
+      
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in Gemini response');
       }
-    } catch (e) {
-      console.error('Failed to save debug JSON:', e);
+
+      jsonString = jsonMatch[0];
+
+      jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
+        return match
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+      });
+
+      const parsedContent = JSON.parse(jsonString);
+
+      const toc = parsedContent.tableOfContents.map((item: any, index: number) => ({
+        id: index + 1,
+        title: item.title,
+        isActive: index === 0
+      }));
+      
+      return {
+        slug: generateSlug(parsedContent.title),
+        title: parsedContent.title,
+        description: parsedContent.metaDescription,
+        category: category,
+        tags: parsedContent.tags,
+        coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
+        author: {
+          name: 'QuickTools AI Team',
+          avatar: 'https://ui-avatars.com/api/?name=QuickTools+AI&background=6D5EF8&color=fff',
+          isVerified: true,
+          bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
+        },
+        readTime: parsedContent.readTime || '10 min read',
+        publishedAt: new Date(),
+        views: `0 views`,
+        
+        content: parsedContent.content,
+        tableOfContents: toc,
+        whatYoullLearn: parsedContent.whatYoullLearn || [],
+        
+        prosAndCons: parsedContent.prosAndCons || { pros: [], cons: [] },
+        comparisonTable: parsedContent.comparisonTable || { headers: [], rows: [] },
+        faq: parsedContent.faq || [],
+        
+        relatedSlugs: relatedSlugs,
+        internalLinks: parsedContent.internalLinks || [],
+        externalLinks: parsedContent.externalLinks || [],
+        
+        metaTitle: parsedContent.metaTitle,
+        metaDescription: parsedContent.metaDescription
+      };
+
+    } catch (error) {
+      console.error("AI Article Generation Error:", error);
+      throw error;
     }
-    throw error;
+  } finally {
+    isGenerating = false;
   }
-}
