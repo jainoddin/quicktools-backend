@@ -26,6 +26,8 @@ const SEO_KEYWORDS = [
   { keyword: "AI Business Ideas", category: "Business" }
 ];
 
+import { CronLock } from '../models/CronLock';
+
 function generateSlug(title: string): string {
   return title
     .toLowerCase()
@@ -36,26 +38,38 @@ function generateSlug(title: string): string {
 }
 
 export async function generateBlog(): Promise<any> {
-  const currentYear = new Date().getFullYear();
-  // 1. Fetch all existing blogs to avoid duplicate keywords and slugs
-  const existingBlogs = await Blog.find({}, 'title slug category').lean();
-  
-  // 2. Filter out keywords that we have already written about (Duplicate Topic Prevention)
-  // We check if the existing blog titles closely match our keyword pool
-  const usedKeywords = existingBlogs.map(b => b.title.toLowerCase());
-  
-  let availableKeywords = SEO_KEYWORDS.filter(k => 
-    !usedKeywords.some(used => used.includes(k.keyword.toLowerCase()))
-  );
-
-  // If we somehow exhausted all keywords, reset the pool (or we could fetch more from AI)
-  if (availableKeywords.length === 0) {
-    console.log("⚠️ All keywords from the pool are used. Reusing existing keywords pool.");
-    availableKeywords = SEO_KEYWORDS;
+  try {
+    await CronLock.create({ key: 'blog_generator' });
+  } catch (error) {
+    console.log("⚠️ Blog generation is already in progress. Skipping to prevent duplicates.");
+    throw new Error('Generation already in progress (DB lock active)');
   }
 
-  // 3. Select a unique topic
-  const randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+  try {
+    const currentYear = new Date().getFullYear();
+    // 1. Fetch all existing blogs to avoid duplicate keywords and slugs
+    const existingBlogs = await Blog.find({}, 'title slug category').lean();
+    
+    // 2. Filter out keywords that we have already written about (Duplicate Topic Prevention)
+    const usedKeywords = existingBlogs.map(b => b.title.toLowerCase());
+    
+    let availableKeywords = SEO_KEYWORDS.filter(k => {
+      const topicKeywords = k.keyword.toLowerCase().split(' ').filter(w => w.length > 3);
+      return !usedKeywords.some(used => 
+        topicKeywords.filter(kw => used.includes(kw)).length >= 2
+      );
+    });
+
+  let randomTopic;
+  if (availableKeywords.length === 0) {
+    console.log("⚠️ All keywords used. Requesting a completely fresh, unused AI topic.");
+    randomTopic = {
+      keyword: "Fresh AI Topic Not In The List (invent something new and relevant)",
+      category: "AI & Tools"
+    };
+  } else {
+    randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+  }
   const { keyword, category } = randomTopic;
 
   // 4. Get Related Posts (Auto Related Posts)
@@ -66,6 +80,18 @@ export async function generateBlog(): Promise<any> {
   }
   const shuffledRelated = relatedBlogs.sort(() => 0.5 - Math.random()).slice(0, 3);
   const relatedSlugs = shuffledRelated.map(b => b.slug);
+
+  // 5. Read real tools for internal links
+  let realToolsContext = "";
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
+    const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
+    realToolsContext = sampleTools.map((t: any) => `- ${t.url} (Anchor: ${t.name})`).join('\n');
+  } catch (e) {
+    console.error("Could not load tools_data.json for internal links", e);
+  }
 
   const prompt = `You are a Senior SEO Content Strategist and AI Journalist writing for QuickTools.ai — a premium platform for AI tools.
 
@@ -84,6 +110,8 @@ Requirements:
 - A dedicated FAQ section with 5-8 common questions.
 - A strong conclusion.
 - Mention QuickTools.ai naturally 2-3 times as the go-to place for discovering AI tools.
+- IMPORTANT: Use these REAL tools for any internal links you want to include:
+${realToolsContext}
 - Highly SEO optimized, beginner-friendly, but with expert-level insights.
 - CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using past years like 2024 or 2025.
 
@@ -116,7 +144,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
   try {
     text = await runWithFailover(async (genAI) => {
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3-flash-preview',
         generationConfig: {
           temperature: 0.7, 
           maxOutputTokens: 8192,
@@ -172,6 +200,12 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
     metaTitle: generated.metaTitle || generated.title,
     metaDescription: generated.metaDescription || generated.description,
   };
+  } catch (error) {
+    console.error("AI Blog Generation Error:", error);
+    throw error;
+  } finally {
+    await CronLock.deleteOne({ key: 'blog_generator' });
+  }
 }
 
 export async function generateToolText(params: {
