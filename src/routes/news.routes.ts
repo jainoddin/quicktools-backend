@@ -6,19 +6,31 @@ const router = Router();
 // GET /api/news — Get all news with filters
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { category, tag, limit = 10, page = 1, isBreaking } = req.query;
+    const { category, tag, limit = 10, page = 1, isBreaking, search, sort } = req.query;
 
     const filter: Record<string, unknown> = {};
     if (category && category !== 'All News') filter.category = category;
     if (tag) filter.tags = { $in: [tag] };
     if (isBreaking === 'true') filter.isBreaking = true;
+    if (search) {
+      const searchStr = String(search);
+      filter.$or = [
+        { title: { $regex: searchStr, $options: 'i' } },
+        { summary: { $regex: searchStr, $options: 'i' } }
+      ];
+    }
+
+    let sortConfig: any = { publishedAt: -1 };
+    if (sort === 'Popular') {
+      sortConfig = { publishedAt: 1 };
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const [newsItems, total] = await Promise.all([
       News.find(filter)
         .select('-whatHappened -whyItMatters -industryReaction -quickToolsInsight -conclusion -keyHighlights -relatedSlugs')
-        .sort({ publishedAt: -1 })
+        .sort(sortConfig)
         .skip(skip)
         .limit(Number(limit)),
       News.countDocuments(filter),

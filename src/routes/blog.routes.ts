@@ -6,19 +6,31 @@ const router = Router();
 // GET /api/blogs — Get all blogs with filters
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { category, tag, limit = 10, page = 1, featured } = req.query;
+    const { category, tag, limit = 10, page = 1, featured, search, sort } = req.query;
 
     const filter: Record<string, unknown> = {};
     if (category) filter.category = category;
     if (tag) filter.tags = { $in: [tag] };
     if (featured === 'true') filter.featured = true;
+    if (search) {
+      const searchStr = String(search);
+      filter.$or = [
+        { title: { $regex: searchStr, $options: 'i' } },
+        { description: { $regex: searchStr, $options: 'i' } }
+      ];
+    }
+
+    let sortConfig: any = { publishedAt: -1 };
+    if (sort === 'Popular') {
+      sortConfig = { publishedAt: 1 }; // Simple alternate sort for now
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
         .select('-content -tableOfContents -whatYoullLearn -relatedSlugs')
-        .sort({ publishedAt: -1 })
+        .sort(sortConfig)
         .skip(skip)
         .limit(Number(limit)),
       Blog.countDocuments(filter),

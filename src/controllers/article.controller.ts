@@ -4,16 +4,29 @@ import { Article } from '../models/Article';
 // GET /api/articles
 export const getArticles = async (req: Request, res: Response) => {
   try {
-    const { category, page = 1, limit = 10 } = req.query;
+    const { category, page = 1, limit = 10, search, sort } = req.query;
     const query: any = {};
-    if (category) query.category = category;
+    if (category && category !== 'All Articles') query.category = category;
+
+    if (search) {
+      const searchStr = String(search);
+      query.$or = [
+        { title: { $regex: searchStr, $options: 'i' } },
+        { description: { $regex: searchStr, $options: 'i' } }
+      ];
+    }
+
+    let sortConfig: any = { publishedAt: -1 };
+    if (sort === 'Popular') {
+      sortConfig = { publishedAt: 1 };
+    }
 
     const limitNum = Math.min(Number(limit), 500); // cap at 500 for sitemap
     const skip = (Number(page) - 1) * limitNum;
     
     // Fetch articles sorted by latest
     const articles = await Article.find(query)
-      .sort({ publishedAt: -1 })
+      .sort(sortConfig)
       .skip(skip)
       .limit(limitNum)
       .select('-content -tableOfContents -prosAndCons -comparisonTable -faq -relatedSlugs -internalLinks -externalLinks');
