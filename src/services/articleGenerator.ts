@@ -165,7 +165,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
     try {
       let rawText = await runWithFailover(async (genAI: any) => {
         const model = genAI.getGenerativeModel({ 
-          model: 'gemini-1.5-flash',
+          model: 'gemini-1.5-flash-latest',
           generationConfig: {
             temperature: 0.7, 
             maxOutputTokens: 8192,

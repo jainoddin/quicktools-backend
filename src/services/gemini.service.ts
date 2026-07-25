@@ -144,7 +144,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
   try {
     text = await runWithFailover(async (genAI) => {
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
+        model: 'gemini-1.5-flash-latest',
         generationConfig: {
           temperature: 0.7, 
           maxOutputTokens: 8192,
@@ -233,7 +233,7 @@ Do NOT include any extra conversational text (e.g., "Here is your blog post:"). 
 
   return await runWithFailover(async (genAI) => {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-1.5-flash-latest',
       generationConfig: {
         temperature: params.creativity / 10,
       }
@@ -283,7 +283,7 @@ If the user requests a backend or script-based language (like Python, SQL, C++, 
 
   const text = await runWithFailover(async (genAI) => {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-1.5-flash-latest',
       generationConfig: {
         temperature: 0.3,
         responseMimeType: "application/json"
