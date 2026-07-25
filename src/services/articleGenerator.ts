@@ -41,10 +41,10 @@ export async function generateArticle(): Promise<any> {
     const currentYear = new Date().getFullYear();
     const existingArticles = await Article.find({}, 'title slug category').lean();
     const usedKeywords = existingArticles.map(a => a.title.toLowerCase());
-    
+
     let availableKeywords = ARTICLE_KEYWORDS.filter(k => {
       const topicKeywords = k.keyword.toLowerCase().split(' ').filter(w => w.length > 3);
-      return !usedKeywords.some(used => 
+      return !usedKeywords.some(used =>
         topicKeywords.filter(kw => used.includes(kw)).length >= 2
       );
     });
@@ -164,10 +164,10 @@ Return STRICTLY a JSON object matching this EXACT structure:
     let jsonString: string | undefined = undefined;
     try {
       let rawText = await runWithFailover(async (genAI: any) => {
-        const model = genAI.getGenerativeModel({ 
-          model: 'gemini-1.5-flash-latest',
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-1.5-flash',
           generationConfig: {
-            temperature: 0.7, 
+            temperature: 0.7,
             maxOutputTokens: 8192,
             responseMimeType: 'application/json'
           }
@@ -175,7 +175,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
         const result = await model.generateContent(prompt);
         return result.response.text();
       });
-      
+
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No valid JSON found in Gemini response');
@@ -197,7 +197,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
         title: item.title,
         isActive: index === 0
       }));
-      
+
       return {
         slug: generateSlug(parsedContent.title),
         title: parsedContent.title,
@@ -214,19 +214,19 @@ Return STRICTLY a JSON object matching this EXACT structure:
         readTime: parsedContent.readTime || '10 min read',
         publishedAt: new Date(),
         views: `0 views`,
-        
+
         content: parsedContent.content,
         tableOfContents: toc,
         whatYoullLearn: parsedContent.whatYoullLearn || [],
-        
+
         prosAndCons: parsedContent.prosAndCons || { pros: [], cons: [] },
         comparisonTable: parsedContent.comparisonTable || { headers: [], rows: [] },
         faq: parsedContent.faq || [],
-        
+
         relatedSlugs: relatedSlugs,
         internalLinks: parsedContent.internalLinks || [],
         externalLinks: parsedContent.externalLinks || [],
-        
+
         metaTitle: parsedContent.metaTitle,
         metaDescription: parsedContent.metaDescription
       };
