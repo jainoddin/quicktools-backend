@@ -51,8 +51,8 @@ export async function generateAndSendMarketingEmail() {
       Ensure the output is ONLY valid JSON, without any markdown formatting blocks.
     `;
 
-    const generatedText = await runWithFailover(async (genAI) => {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: 'application/json' } });
+    const generatedText = await runWithFailover(async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: 'application/json' } });
       const result = await model.generateContent(emailPrompt);
       return result.response.text();
     });

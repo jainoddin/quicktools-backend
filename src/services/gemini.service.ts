@@ -142,9 +142,9 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
 
   let text = "";
   try {
-    text = await runWithFailover(async (genAI) => {
+    text = await runWithFailover(async (genAI, modelName) => {
       const model = genAI.getGenerativeModel({ 
-        model: 'gemini-flash-latest',
+        model: modelName,
         generationConfig: {
           temperature: 0.7, 
           maxOutputTokens: 8192,
@@ -231,9 +231,9 @@ Do NOT include any extra conversational text (e.g., "Here is your blog post:"). 
 
   console.log(`🤖 Generating ${params.contentType} for prompt: "${params.prompt.substring(0, 50)}..."`);
 
-  return await runWithFailover(async (genAI) => {
+  return await runWithFailover(async (genAI, modelName) => {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-flash-latest',
+      model: modelName,
       generationConfig: {
         temperature: params.creativity / 10,
       }
@@ -281,9 +281,9 @@ If the user requests a backend or script-based language (like Python, SQL, C++, 
   const finalPrompt = `${systemPrompt}\n\nUser Request:\n${params.prompt}`;
   console.log(`🤖 Generating code using Gemini for: "${params.prompt.substring(0, 50)}..."`);
 
-  const text = await runWithFailover(async (genAI) => {
+  const text = await runWithFailover(async (genAI, modelName) => {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-flash-latest',
+      model: modelName,
       generationConfig: {
         temperature: 0.3,
         responseMimeType: "application/json"

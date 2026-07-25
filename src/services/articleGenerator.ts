@@ -163,9 +163,9 @@ Return STRICTLY a JSON object matching this EXACT structure:
 
     let jsonString: string | undefined = undefined;
     try {
-      let rawText = await runWithFailover(async (genAI: any) => {
+      let rawText = await runWithFailover(async (genAI: any, modelName: string) => {
         const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
+          model: modelName,
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 8192,

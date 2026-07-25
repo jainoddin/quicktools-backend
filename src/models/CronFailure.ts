@@ -6,6 +6,7 @@ export interface ICronFailure extends Document {
   error: string;
   type: string;
   resolved: boolean;
+  emailed: boolean;
 }
 
 const CronFailureSchema = new Schema<ICronFailure>({
@@ -13,7 +14,8 @@ const CronFailureSchema = new Schema<ICronFailure>({
   blogSlug: { type: String, required: false },
   error: { type: String, required: true },
   type: { type: String, required: true },
-  resolved: { type: Boolean, default: false }
+  resolved: { type: Boolean, default: false },
+  emailed: { type: Boolean, default: false }
 });
 
 export const CronFailure = mongoose.models.CronFailure || mongoose.model<ICronFailure>('CronFailure', CronFailureSchema);

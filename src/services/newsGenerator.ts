@@ -118,9 +118,9 @@ Return STRICTLY a raw JSON object matching this exact schema:
   "conclusion": "Markdown formatted short conclusion..."
 }`;
 
-  const parsedContent = await runWithFailover(async (genAIInstance) => {
-      const model = genAIInstance.getGenerativeModel({
-        model: 'gemini-flash-latest',
+  const parsedContent = await runWithFailover(async (genAIInstance, modelName) => {
+      const model = genAIInstance.getGenerativeModel({ 
+        model: modelName,
         generationConfig: {
           temperature: 0.3, // Lower temperature for more factual, journalistic reporting
           maxOutputTokens: 4096,

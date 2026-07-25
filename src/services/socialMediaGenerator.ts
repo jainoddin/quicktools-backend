@@ -41,8 +41,8 @@ export async function generateAndPostToSocialMedia() {
       Return ONLY the text of the post. Do not include any JSON, quotes, or markdown formatting blocks.
     `;
 
-    const generatedText = await runWithFailover(async (genAI) => {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const generatedText = await runWithFailover(async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(postPrompt);
       return result.response.text();
     });
