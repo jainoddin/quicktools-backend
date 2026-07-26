@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { User, IUser } from '../models/user.model';
 import { FRONTEND_URL, JWT_SECRET } from '../config/env';
 
@@ -97,6 +98,71 @@ router.get(
     setAuthCookiesAndRedirect(req, res, req.user as IUser);
   }
 );
+
+// ==========================================
+// 2c. Native Google Sign-In (Mobile App)
+// ==========================================
+router.post('/google/verify-native', async (req: Request, res: Response) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ success: false, message: 'Missing idToken' });
+
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: [
+        process.env.GOOGLE_CLIENT_ID || '', // Web Client ID
+        // Note: You can add Android Client ID here if needed, but often verifying with Web Client ID works if the token was issued for it.
+      ],
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return res.status(400).json({ success: false, message: 'Invalid token payload' });
+    }
+
+    // Find or create user
+    let user = await User.findOne({ email: payload.email });
+    
+    if (!user) {
+      user = new User({
+        email: payload.email,
+        name: payload.name || payload.email.split('@')[0],
+        avatar: payload.picture,
+        googleId: payload.sub,
+        plan: 'free',
+        credits: 10, // Initial free credits
+      });
+      await user.save();
+    } else if (!user.googleId) {
+      // Link Google account to existing email
+      user.googleId = payload.sub;
+      if (!user.avatar) user.avatar = payload.picture;
+      await user.save();
+    }
+
+    // Generate our JWT
+    const token = generateToken(user);
+
+    // Return the token and user data directly (no cookies needed for native app)
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        role: user.role,
+        bio: user.bio || '',
+        plan: user.plan || 'free',
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying native Google token:', error);
+    res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+});
 
 // ==========================================
 // 3. Get Current Authenticated User (for Frontend state)
