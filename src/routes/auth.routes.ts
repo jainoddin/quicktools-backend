@@ -128,7 +128,7 @@ router.post('/google/verify-native', async (req: Request, res: Response) => {
       user = new User({
         email: payload.email,
         name: payload.name || payload.email.split('@')[0],
-        avatar: payload.picture,
+        avatar: payload.picture || '',
         googleId: payload.sub,
         plan: 'free',
         credits: 10, // Initial free credits
@@ -137,7 +137,7 @@ router.post('/google/verify-native', async (req: Request, res: Response) => {
     } else if (!user.googleId) {
       // Link Google account to existing email
       user.googleId = payload.sub;
-      if (!user.avatar) user.avatar = payload.picture;
+      if (!user.avatar) user.avatar = payload.picture || '';
       await user.save();
     }
 
