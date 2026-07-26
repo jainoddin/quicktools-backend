@@ -15,7 +15,7 @@ const generateToken = (user: IUser) => {
   );
 };
 
-const setAuthCookiesAndRedirect = (res: Response, user: IUser) => {
+const setAuthCookiesAndRedirect = (req: Request, res: Response, user: IUser) => {
   const token = generateToken(user);
 
   res.cookie('token', token, {
@@ -38,7 +38,12 @@ const setAuthCookiesAndRedirect = (res: Response, user: IUser) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.redirect(`${FRONTEND_URL}/dashboard`);
+  const isMobile = req.query.state === 'mobile';
+  if (isMobile) {
+    res.redirect(`quicktools://auth-success?token=${token}&user_data=${encodeURIComponent(userData)}`);
+  } else {
+    res.redirect(`${FRONTEND_URL}/dashboard`);
+  }
 };
 
 // ==========================================
@@ -46,10 +51,14 @@ const setAuthCookiesAndRedirect = (res: Response, user: IUser) => {
 // ==========================================
 router.get(
   '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false, // We use JWT, not session cookies
-  })
+  (req: Request, res: Response, next) => {
+    const isMobile = req.query.source === 'mobile';
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+      session: false,
+      state: isMobile ? 'mobile' : undefined,
+    })(req, res, next);
+  }
 );
 
 // ==========================================
@@ -59,7 +68,7 @@ router.get(
   '/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL}/login?error=auth_failed` }),
   (req: Request, res: Response) => {
-    setAuthCookiesAndRedirect(res, req.user as IUser);
+    setAuthCookiesAndRedirect(req, res, req.user as IUser);
   }
 );
 
@@ -68,10 +77,14 @@ router.get(
 // ==========================================
 router.get(
   '/github',
-  passport.authenticate('github', {
-    scope: ['user:email'],
-    session: false,
-  })
+  (req: Request, res: Response, next) => {
+    const isMobile = req.query.source === 'mobile';
+    passport.authenticate('github', {
+      scope: ['user:email'],
+      session: false,
+      state: isMobile ? 'mobile' : undefined,
+    })(req, res, next);
+  }
 );
 
 router.get(
@@ -81,7 +94,7 @@ router.get(
     failureRedirect: `${FRONTEND_URL}/login?error=auth_failed`,
   }),
   (req: Request, res: Response) => {
-    setAuthCookiesAndRedirect(res, req.user as IUser);
+    setAuthCookiesAndRedirect(req, res, req.user as IUser);
   }
 );
 
