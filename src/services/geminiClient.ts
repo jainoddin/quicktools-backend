@@ -4,12 +4,11 @@ const keys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').s
 let currentKeyIndex = 0;
 
 const DEFAULT_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-pro',
-  'gemini-1.0-pro'
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+  'gemini-3.1-pro-preview'
 ];
 
 export async function runWithFailover<T>(
