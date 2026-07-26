@@ -81,13 +81,15 @@ export async function generateBlog(): Promise<any> {
   const shuffledRelated = relatedBlogs.sort(() => 0.5 - Math.random()).slice(0, 3);
   const relatedSlugs = shuffledRelated.map(b => b.slug);
 
-  // 5. Read real tools for internal links
+  // 5. Read real tools for internal links - send more samples so AI doesn't invent fake slugs
   let realToolsContext = "";
+  let validToolSlugs = new Set<string>();
   try {
     const fs = require('fs');
     const path = require('path');
     const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
-    const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
+    toolsData.forEach((t: any) => validToolSlugs.add(t.slug));
+    const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 25);
     realToolsContext = sampleTools.map((t: any) => `- https://quicktool.space/tools/${t.slug} (Anchor: ${t.name})`).join('\n');
   } catch (e) {
     console.error("Could not load tools_data.json for internal links", e);
@@ -178,6 +180,19 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
   const wordCount = generated.content.split(/\s+/).length;
   const readTime = generated.readTime || `${Math.ceil(wordCount / 200)} min read`;
 
+  // ── Post-Processing: Strip any invalid tool links AI may have invented ──
+  let cleanContent = generated.content;
+  if (validToolSlugs.size > 0) {
+    cleanContent = cleanContent.replace(
+      /\[([^\]]+)\]\(https?:\/\/quicktool\.space\/tools\/([a-zA-Z0-9-]+)\)/g,
+      (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+    );
+    cleanContent = cleanContent.replace(
+      /\[([^\]]+)\]\(\/tools\/([a-zA-Z0-9-]+)\)/g,
+      (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+    );
+  }
+
   return {
     slug,
     title: generated.title,
@@ -194,7 +209,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
     featured: false,
     tableOfContents: generated.tableOfContents || [],
     whatYoullLearn: generated.whatYoullLearn || [],
-    content: generated.content,
+    content: cleanContent,
     faq: generated.faq || [],
     relatedSlugs,
     metaTitle: generated.metaTitle || generated.title,

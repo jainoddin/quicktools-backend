@@ -68,12 +68,16 @@ export async function generateArticle(): Promise<any> {
     const shuffledRelated = relatedArticles.sort(() => 0.5 - Math.random()).slice(0, 4);
     const relatedSlugs = shuffledRelated.map(a => a.slug);
 
-    // Read real tools for internal links
+    // Read real tools for internal links - send ALL tools so AI doesn't invent fake slugs
     let realToolsContext = "";
+    let validToolSlugs = new Set<string>();
     try {
       const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
-      const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
-      realToolsContext = sampleTools.map((t: any) => `- https://quicktool.space/tools/${t.slug} (Anchor: ${t.name})`).join('\\n');
+      // Build set of all valid slugs for post-processing validation
+      toolsData.forEach((t: any) => validToolSlugs.add(t.slug));
+      // Shuffle and pick 20 relevant samples for the prompt (more = better accuracy)
+      const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 25);
+      realToolsContext = sampleTools.map((t: any) => `- https://quicktool.space/tools/${t.slug} (Anchor: ${t.name})`).join('\n');
     } catch (e) {
       console.error("Could not load tools_data.json for internal links", e);
     }
@@ -198,6 +202,27 @@ Return STRICTLY a JSON object matching this EXACT structure:
         isActive: index === 0
       }));
 
+      // ── Post-Processing: Strip any invalid tool links AI may have invented ──
+      let cleanContent = parsedContent.content;
+      if (validToolSlugs.size > 0) {
+        // Remove markdown links to non-existent tool pages: [anchor](https://quicktool.space/tools/bad-slug)
+        cleanContent = cleanContent.replace(
+          /\[([^\]]+)\]\(https?:\/\/quicktool\.space\/tools\/([a-zA-Z0-9-]+)\)/g,
+          (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+        );
+        // Also strip relative /tools/ links
+        cleanContent = cleanContent.replace(
+          /\[([^\]]+)\]\(\/tools\/([a-zA-Z0-9-]+)\)/g,
+          (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+        );
+      }
+
+      // Filter internalLinks to only valid slugs
+      const validInternalLinks = (parsedContent.internalLinks || []).filter((link: any) => {
+        const slug = link.path?.split('/').pop();
+        return slug && (validToolSlugs.size === 0 || validToolSlugs.has(slug));
+      });
+
       return {
         slug: generateSlug(parsedContent.title),
         title: parsedContent.title,
@@ -215,7 +240,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
         publishedAt: new Date(),
         views: `0 views`,
 
-        content: parsedContent.content,
+        content: cleanContent,
         tableOfContents: toc,
         whatYoullLearn: parsedContent.whatYoullLearn || [],
 
@@ -224,7 +249,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
         faq: parsedContent.faq || [],
 
         relatedSlugs: relatedSlugs,
-        internalLinks: parsedContent.internalLinks || [],
+        internalLinks: validInternalLinks,
         externalLinks: parsedContent.externalLinks || [],
 
         metaTitle: parsedContent.metaTitle,
