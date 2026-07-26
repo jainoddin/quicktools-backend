@@ -73,7 +73,7 @@ export async function generateArticle(): Promise<any> {
     try {
       const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
       const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
-      realToolsContext = sampleTools.map((t: any) => `- ${t.url} (Anchor: ${t.name})`).join('\\n');
+      realToolsContext = sampleTools.map((t: any) => `- https://quicktool.space/tools/${t.slug} (Anchor: ${t.name})`).join('\\n');
     } catch (e) {
       console.error("Could not load tools_data.json for internal links", e);
     }
@@ -207,7 +207,7 @@ Return STRICTLY a JSON object matching this EXACT structure:
         coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
         author: {
           name: 'QuickTools AI Team',
-          avatar: 'https://ui-avatars.com/api/?name=QuickTools+AI&background=6D5EF8&color=fff',
+          avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',
           isVerified: true,
           bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
         },

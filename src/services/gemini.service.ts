@@ -88,7 +88,7 @@ export async function generateBlog(): Promise<any> {
     const path = require('path');
     const toolsData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'tools_data.json'), 'utf-8'));
     const sampleTools = toolsData.sort(() => 0.5 - Math.random()).slice(0, 15);
-    realToolsContext = sampleTools.map((t: any) => `- ${t.url} (Anchor: ${t.name})`).join('\n');
+    realToolsContext = sampleTools.map((t: any) => `- https://quicktool.space/tools/${t.slug} (Anchor: ${t.name})`).join('\n');
   } catch (e) {
     console.error("Could not load tools_data.json for internal links", e);
   }
