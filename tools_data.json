@@ -1058,5 +1058,21 @@
     "category": "Business",
     "isPremium": false,
     "createdAt": "2026-07-19T21:23:15.488Z"
+  },
+  {
+    "name": "Legal Loophole Finder",
+    "slug": "ai-legal-loophole-finder"
+  },
+  {
+    "name": "AI Conflict Resolver",
+    "slug": "ai-conflict-resolver"
+  },
+  {
+    "name": "AI Analogy Generator",
+    "slug": "ai-analogy-generator"
+  },
+  {
+    "name": "Subscription Optimizer",
+    "slug": "ai-subscription-optimizer"
   }
 ]
