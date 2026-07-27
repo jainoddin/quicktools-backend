@@ -43,7 +43,8 @@ const setAuthCookiesAndRedirect = (req: Request, res: Response, user: IUser) => 
   if (isMobile) {
     res.redirect(`quicktools://auth-success?token=${token}&user_data=${encodeURIComponent(userData)}`);
   } else {
-    res.redirect(`${FRONTEND_URL}/dashboard`);
+    // Pass tokens in URL so frontend Next.js can intercept and set first-party cookies
+    res.redirect(`${FRONTEND_URL}/dashboard?token=${token}&user_data=${encodeURIComponent(userData)}`);
   }
 };
 

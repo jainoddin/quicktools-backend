@@ -49,7 +49,15 @@ app.use(
     origin(origin, cb) {
       // allow non-browser clients (curl/postman) with no origin
       if (!origin) return cb(null, true);
-      if (allowedOrigins.has(origin)) return cb(null, true);
+      
+      // Allow any local LAN IP during development for mobile testing
+      if (!isProd && (origin.startsWith('http://192.168.') || origin.startsWith('http://10.') || origin.startsWith('http://172.'))) {
+        return cb(null, true);
+      }
+
+      if (allowedOrigins.has(origin)) {
+        return cb(null, true);
+      }
       return cb(new Error('Not allowed by CORS'));
     },
     credentials: true,
