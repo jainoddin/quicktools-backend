@@ -13,7 +13,36 @@ import mongoose from 'mongoose';
 
 const router = Router();
 
+// -------------------------------------------------------
+// FREE TRIAL HELPER — apply to any premium tool route
+// Returns true if user can proceed via free trial (deducts from daily counter)
+// Returns false if trial expired/exhausted (caller should check credits)
+// -------------------------------------------------------
+async function applyFreeTrial(user: any): Promise<boolean> {
+  const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+  const isTrialActive = user.createdAt
+    ? Date.now() - new Date(user.createdAt).getTime() <= threeDaysInMillis
+    : false;
 
+  if (!isTrialActive) return false;
+
+  const today = new Date().toISOString().split('T')[0];
+  const lastGenDate = user.lastGenerationDate
+    ? new Date(user.lastGenerationDate).toISOString().split('T')[0]
+    : '';
+
+  if (today !== lastGenDate) {
+    user.freeGenerationsCount = 0;
+    user.lastGenerationDate = new Date();
+  }
+
+  if (user.freeGenerationsCount < 5) {
+    user.freeGenerationsCount += 1;
+    return true;
+  }
+
+  return false;
+}
 
 // Rate limiter for image generation to prevent spam/bots
 const imageGenerationLimiter = rateLimit({
@@ -122,15 +151,24 @@ router.post('/generate-text', async (req: Request, res: Response) => {
 
     let user = null;
     const creditsNeeded = 10; // AI Writer uses 10 credits
+    let usingTrial = false;
 
-    // 1. Check user credits if authenticated
+    // 1. Check user credits / free trial if authenticated
     if (userId) {
       user = await User.findById(userId);
-      if (user && user.credits < creditsNeeded) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'Not enough credits. Please upgrade to Premium.' 
-        });
+      if (user) {
+        usingTrial = await applyFreeTrial(user);
+        if (!usingTrial && user.credits < creditsNeeded) {
+          return res.status(403).json({ 
+            success: false, 
+            message: 'Not enough credits. Please upgrade to Premium.',
+            errorType: 'INSUFFICIENT_CREDITS'
+          });
+        }
+        if (!usingTrial) {
+          user.credits -= creditsNeeded;
+        }
+        await user.save();
       }
     }
 
@@ -143,19 +181,16 @@ router.post('/generate-text', async (req: Request, res: Response) => {
       creativity: creativity || 6,
     });
 
-    // 3. Deduct credits and track usage for authenticated users
+    // 3. Track usage for authenticated users
     let usageId = null;
     if (user) {
-      user.credits -= creditsNeeded;
-      await user.save();
-
       const usage = await ToolUsage.create({
         userId: user._id,
         toolSlug: toolSlug || '/tools/ai-writer',
         toolName: toolName || 'AI Writer',
         prompt: prompt.substring(0, 500),
         result: text,
-        creditsUsed: creditsNeeded,
+        creditsUsed: usingTrial ? 0 : creditsNeeded,
       });
       usageId = usage._id;
     }
@@ -222,15 +257,39 @@ router.post('/generate-image', imageGenerationLimiter, async (req: Request, res:
         if (user) {
           (req as any).user = user; // Attach user to req for saveFreeToolUsage
           const creditsNeeded = 5;
-          if (user.credits < creditsNeeded) {
-            return res.status(403).json({ 
-              success: false, 
-              message: 'Not enough credits. Please upgrade to generate more images.',
-              errorType: 'INSUFFICIENT_CREDITS'
-            });
+          let useTrial = false;
+
+          // Check 3-Day Free Trial (5 free gens per day)
+          const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000;
+          const isTrialActive = user.createdAt ? (Date.now() - new Date(user.createdAt).getTime()) <= threeDaysInMillis : false;
+
+          if (isTrialActive) {
+            const today = new Date().toISOString().split('T')[0];
+            const lastGenDate = user.lastGenerationDate ? new Date(user.lastGenerationDate).toISOString().split('T')[0] : '';
+            
+            if (today !== lastGenDate) {
+              user.freeGenerationsCount = 0;
+              user.lastGenerationDate = new Date();
+            }
+
+            if (user.freeGenerationsCount < 5) {
+              user.freeGenerationsCount += 1;
+              useTrial = true;
+            }
           }
-          // Deduct credits
-          user.credits -= creditsNeeded;
+
+          if (!useTrial) {
+            if (user.credits < creditsNeeded) {
+              return res.status(403).json({ 
+                success: false, 
+                message: 'Not enough credits. Please upgrade to generate more images.',
+                errorType: 'INSUFFICIENT_CREDITS'
+              });
+            }
+            // Deduct credits
+            user.credits -= creditsNeeded;
+          }
+
           await user.save();
           usageId = await saveFreeToolUsage(req, '/tools/ai-image-generator', 'AI Image Generator', prompt, imageUrl);
         }
@@ -277,18 +336,24 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (user.plan === 'free' && user.credits < credits) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Not enough credits. Please upgrade to use this tool.',
-        errorType: 'INSUFFICIENT_CREDITS'
-      });
+    // Check 3-day free trial first
+    const usingTrial = await applyFreeTrial(user);
+
+    if (!usingTrial) {
+      if (user.plan === 'free' && user.credits < credits) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Not enough credits. Please upgrade to use this tool.',
+          errorType: 'INSUFFICIENT_CREDITS'
+        });
+      }
+
+      if (user.plan === 'free') {
+        user.credits -= credits;
+      }
     }
 
-    if (user.plan === 'free') {
-      user.credits -= credits;
-      await user.save();
-    }
+    await user.save();
 
     await ToolUsage.create({
       userId: user._id,
@@ -296,7 +361,7 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
       toolName: toolName || 'Tool',
       prompt: prompt || 'Client-side image processing',
       result: result || 'Processed successfully',
-      creditsUsed: credits,
+      creditsUsed: usingTrial ? 0 : credits,
     });
 
     res.json({
@@ -315,6 +380,7 @@ router.post('/deduct-credits', verifyAuth, async (req: Request, res: Response) =
 });
 
 // POST /api/tools/generate-code
+
 router.post('/generate-code', async (req: Request, res: Response) => {
   try {
     const { prompt, language, framework, codeType } = req.body;
@@ -338,16 +404,25 @@ router.post('/generate-code', async (req: Request, res: Response) => {
 
     let user = null;
     const creditsNeeded = 50; // Code generator uses 50 credits
+    let usingTrial = false;
 
-    // 1. Check user credits if authenticated
+    // 1. Check user credits / free trial if authenticated
     if (userId) {
       try {
         user = await User.findById(userId).maxTimeMS(2000);
-        if (user && user.credits < creditsNeeded) {
-          return res.status(403).json({ 
-            success: false, 
-            message: 'Not enough credits. Please upgrade to Premium.' 
-          });
+        if (user) {
+          usingTrial = await applyFreeTrial(user);
+          if (!usingTrial && user.credits < creditsNeeded) {
+            return res.status(403).json({ 
+              success: false, 
+              message: 'Not enough credits. Please upgrade to Premium.',
+              errorType: 'INSUFFICIENT_CREDITS'
+            });
+          }
+          if (!usingTrial) {
+            user.credits -= creditsNeeded;
+          }
+          await user.save();
         }
       } catch (dbError) {
         console.warn('⚠️ MongoDB error during credit check, bypassing:', dbError);
@@ -363,13 +438,10 @@ router.post('/generate-code', async (req: Request, res: Response) => {
       codeType: codeType || 'Frontend (Web)'
     });
 
-    // 3. Deduct credits and track usage for authenticated users
+    // 3. Track usage for authenticated users
     let usageId = null;
     if (user) {
       try {
-        user.credits -= creditsNeeded;
-        await user.save();
-
         const usage = await ToolUsage.create({
           userId: user._id,
           toolSlug: '/tools/ai-code',
@@ -381,7 +453,7 @@ router.post('/generate-code', async (req: Request, res: Response) => {
             js: generatedCode.js || '',
             explanation: generatedCode.explanation
           }),
-          creditsUsed: creditsNeeded,
+          creditsUsed: usingTrial ? 0 : creditsNeeded,
         });
         usageId = usage._id;
       } catch (dbError) {
@@ -429,15 +501,24 @@ router.post('/generate-video', async (req: Request, res: Response) => {
 
     let user = null;
     const creditsNeeded = 10; // AI Video generator uses 10 credits
+    let usingTrial = false;
 
-    // 1. Check user credits if authenticated
+    // 1. Check user credits / free trial if authenticated
     if (userId) {
       user = await User.findById(userId);
-      if (user && user.plan === 'free' && user.credits < creditsNeeded) {
-        return res.status(403).json({ 
-          success: false, 
-          message: 'Not enough credits. Please upgrade to Premium.' 
-        });
+      if (user) {
+        usingTrial = await applyFreeTrial(user);
+        if (!usingTrial && user.plan === 'free' && user.credits < creditsNeeded) {
+          return res.status(403).json({ 
+            success: false, 
+            message: 'Not enough credits. Please upgrade to Premium.',
+            errorType: 'INSUFFICIENT_CREDITS'
+          });
+        }
+        if (!usingTrial && user.plan === 'free') {
+          user.credits -= creditsNeeded;
+        }
+        await user.save();
       }
     }
 
@@ -469,19 +550,16 @@ router.post('/generate-video', async (req: Request, res: Response) => {
       prompt: prompt
     };
 
-    // 3. Deduct credits and track usage for authenticated users
+    // 3. Track usage for authenticated users
     let usageId = null;
     if (user) {
-      user.credits -= creditsNeeded;
-      await user.save();
-
       const usage = await ToolUsage.create({
         userId: user._id,
         toolSlug: '/tools/ai-video-generator',
         toolName: 'AI Video Generator',
         prompt: prompt.substring(0, 500),
         result: JSON.stringify(resultData),
-        creditsUsed: creditsNeeded,
+        creditsUsed: usingTrial ? 0 : creditsNeeded,
       });
       usageId = usage._id;
     }
