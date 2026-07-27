@@ -12,6 +12,7 @@ import { premiumPrompts } from '../config/premiumPrompts';
 import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
+import toolsData from '../data/tools.json';
 
 const router = Router();
 
@@ -56,12 +57,9 @@ const imageGenerationLimiter = rateLimit({
 // GET /api/tools/list
 router.get('/list', (req: Request, res: Response) => {
   try {
-    const toolsPath = path.join(__dirname, '../data/tools.json');
-    const toolsData = fs.readFileSync(toolsPath, 'utf-8');
-    const tools = JSON.parse(toolsData);
     res.json({
       success: true,
-      data: tools
+      data: toolsData
     });
   } catch (error) {
     console.error('Error loading tools.json:', error);
