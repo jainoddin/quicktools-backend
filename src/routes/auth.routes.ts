@@ -170,7 +170,7 @@ router.post('/google/verify-native', async (req: Request, res: Response) => {
 // ==========================================
 router.get('/me', async (req: Request, res: Response) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({ authenticated: false, message: 'No token found' });
@@ -256,7 +256,7 @@ router.post('/logout', (req: Request, res: Response) => {
 // ==========================================
 router.put('/profile', async (req: Request, res: Response) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -319,7 +319,7 @@ router.put('/profile', async (req: Request, res: Response) => {
 // ==========================================
 router.put('/tools/:slug/star', async (req: Request, res: Response) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -355,7 +355,7 @@ router.put('/tools/:slug/star', async (req: Request, res: Response) => {
 // ==========================================
 router.post('/deactivate-account', async (req: Request, res: Response) => {
   try {
-    const token = req.cookies.token;
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'Not authenticated' });
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
