@@ -6,7 +6,15 @@ const router = Router();
 // GET /api/blogs — Get all blogs with filters
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { category, tag, limit = 10, page = 1, featured, search, sort } = req.query;
+    const { category, tag, limit = 10, page = 1, featured, search, sort, ids } = req.query;
+
+    // If ids param provided (for Favorites), fetch those specific blogs
+    if (ids) {
+      const idList = String(ids).split(',').filter(Boolean);
+      const blogs = await Blog.find({ _id: { $in: idList } })
+        .select('-content -tableOfContents -whatYoullLearn -relatedSlugs');
+      return res.json({ success: true, data: blogs, pagination: { total: blogs.length, page: 1, pages: 1 } });
+    }
 
     const filter: Record<string, unknown> = {};
     if (category) filter.category = category;
@@ -22,7 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     let sortConfig: any = { publishedAt: -1, _id: 1 };
     if (sort === 'Popular') {
-      sortConfig = { publishedAt: 1, _id: 1 }; // Simple alternate sort for now
+      sortConfig = { publishedAt: 1, _id: 1 };
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -64,6 +72,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Server error', error });
   }
 });
+
 
 // GET /api/blogs/:slug — Get single blog with related posts
 router.get('/:slug', async (req: Request, res: Response) => {
