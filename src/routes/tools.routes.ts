@@ -10,6 +10,8 @@ import { JWT_SECRET } from '../config/env';
 import { ShortUrl } from '../models/ShortUrl';
 import { premiumPrompts } from '../config/premiumPrompts';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -51,80 +53,20 @@ const imageGenerationLimiter = rateLimit({
   message: { success: false, message: 'Too many images generated from this IP, please try again after 15 minutes' }
 });
 
-// GET /api/tools
-router.get('/', (req: Request, res: Response) => {
-  const tools = [
-    {
-      title: 'AI Image Generator',
-      slug: 'ai-image-generator',
-      category: 'Design',
-      image: 'https://cdn-icons-png.flaticon.com/512/8345/8345328.png'
-    },
-    {
-      title: 'Background Remover',
-      slug: 'background-remover',
-      category: 'Design',
-      image: 'https://cdn-icons-png.flaticon.com/512/10051/10051515.png'
-    },
-    {
-      title: 'AI Writer',
-      slug: 'ai-writer',
-      category: 'Productivity',
-      image: 'https://cdn-icons-png.flaticon.com/512/11186/11186638.png'
-    },
-    {
-      title: 'AI Video Generator',
-      slug: 'ai-video-generator',
-      category: 'Marketing',
-      image: 'https://cdn-icons-png.flaticon.com/512/8061/8061266.png'
-    },
-    {
-      title: 'AI Code Generator',
-      slug: 'ai-code-generator',
-      category: 'Development',
-      image: 'https://cdn-icons-png.flaticon.com/512/10051/10051410.png'
-    },
-    {
-      title: 'AI Text Summarizer',
-      slug: 'ai-summarizer',
-      category: 'Productivity',
-      image: 'https://cdn-icons-png.flaticon.com/512/3159/3159066.png',
-      isFree: true
-    },
-    {
-      title: 'AI Language Translator',
-      slug: 'ai-translator',
-      category: 'Productivity',
-      image: 'https://cdn-icons-png.flaticon.com/512/484/484633.png',
-      isFree: true
-    },
-    {
-      title: 'AI Resume Builder',
-      slug: 'ai-resume-builder',
-      category: 'Productivity',
-      image: 'https://cdn-icons-png.flaticon.com/512/2919/2919592.png',
-      isFree: true
-    },
-    {
-      title: 'AI Color Palette',
-      slug: 'ai-color-palette',
-      category: 'Design',
-      image: 'https://cdn-icons-png.flaticon.com/512/6124/6124995.png',
-      isFree: true
-    },
-    {
-      title: 'URL Shortener',
-      slug: 'url-shortener',
-      category: 'Utilities',
-      image: 'https://cdn-icons-png.flaticon.com/512/1006/1006771.png',
-      isFree: true
-    }
-  ];
-  
-  res.json({
-    success: true,
-    data: tools
-  });
+// GET /api/tools/list
+router.get('/list', (req: Request, res: Response) => {
+  try {
+    const toolsPath = path.join(__dirname, '../data/tools.json');
+    const toolsData = fs.readFileSync(toolsPath, 'utf-8');
+    const tools = JSON.parse(toolsData);
+    res.json({
+      success: true,
+      data: tools
+    });
+  } catch (error) {
+    console.error('Error loading tools.json:', error);
+    res.status(500).json({ success: false, message: 'Failed to load tools' });
+  }
 });
 
 // POST /api/tools/generate-text
