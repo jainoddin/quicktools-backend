@@ -21,6 +21,8 @@ export interface IBlog extends Document {
   faq?: { question: string; answer: string }[];
   metaTitle: string;
   metaDescription: string;
+  redirectUrl?: string;
+  canonicalOverride?: string;
 }
 
 const BlogSchema = new Schema<IBlog>(
@@ -56,6 +58,8 @@ const BlogSchema = new Schema<IBlog>(
     // SEO
     metaTitle: { type: String, required: true },
     metaDescription: { type: String, required: true },
+    redirectUrl: { type: String },
+    canonicalOverride: { type: String },
   },
   { timestamps: true }
 );

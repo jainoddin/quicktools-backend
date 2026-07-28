@@ -23,9 +23,13 @@ export interface INews extends Document {
   relatedSlugs: string[];
   tags: string[];
   category: string;
+  sourceName?: string;
+  sourceUrl?: string;
   
   metaTitle: string;
   metaDescription: string;
+  redirectUrl?: string;
+  canonicalOverride?: string;
 }
 
 const NewsSchema = new Schema<INews>(
@@ -57,9 +61,13 @@ const NewsSchema = new Schema<INews>(
       enum: ['AI News', 'Product Launches', 'Research', 'Funding', 'Partnerships', 'Industry', 'Regulation', 'Other'],
       default: 'AI News'
     },
+    sourceName: { type: String },
+    sourceUrl: { type: String },
     
     metaTitle: { type: String, required: true },
     metaDescription: { type: String, required: true },
+    redirectUrl: { type: String },
+    canonicalOverride: { type: String },
   },
   { timestamps: true }
 );

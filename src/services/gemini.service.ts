@@ -95,50 +95,50 @@ export async function generateBlog(): Promise<any> {
     console.error("Could not load tools_data.json for internal links", e);
   }
 
-  const prompt = `You are a Senior SEO Content Strategist and AI Journalist writing for QuickTools.ai — a premium platform for AI tools.
+  const prompt = `You are a Senior SEO Content Strategist and AI Journalist writing for quicktool.space — a premium platform for AI tools.
 
-Write a comprehensive, engaging, and high-quality blog around this keyword:
-
+Write a comprehensive, engaging, and high-quality blog around this keyword.
+Use original opinions, mention limitations, compare tools, give recommendations. Don't sound like AI. Don't repeat sentence patterns.
 Primary Keyword: ${keyword}
+Previously Used Topics (DO NOT REPEAT THESE): ${usedKeywords.join(', ')}
 
 Requirements:
-- 1800-2500 words minimum.
-- Human writing style (avoid AI sounding phrases like "in conclusion", "it's important to note").
+- SEARCH INTENT & DEDUPLICATION (CRITICAL): Before writing, classify the keyword by search intent against the Previously Used Topics. If a previously used topic already covers the same search intent (e.g., "Best AI Writer" covers "Top AI Writer"), DO NOT generate a blog with the same intent. Instead, instantly pivot and generate a different keyword with a completely different search intent (e.g., "AI Writers for Students", "AI Writers vs ChatGPT", or "How AI Writers Work"). Avoid synonyms like: Best, Top, Leading, Ultimate, Complete Guide, Review when they target the same query.
+- 1200-1800 words minimum. Dive deep but be concise.
+- Structure MUST BE RANDOMIZED. Do NOT use the exact same template for every blog. Mix it up: include a case study, a checklist, common mistakes, or a workflow.
+- Include one original insight and one practical example that differs from previous blogs.
+- Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone. Write as if written by a human editor with first-hand experience.
 - Original and captivating introduction.
 - Clear H2 and H3 headings.
-- Include a comparison table or pros and cons section.
-- Provide real-world examples and use cases.
-- Include the latest industry information.
-- A dedicated FAQ section with 5-8 common questions.
-- A strong conclusion.
-- Mention QuickTools.ai naturally 2-3 times as the go-to place for discovering AI tools.
+- E-E-A-T signals: Add a "Last Updated: [Current Month/Year]" and "Reviewed by quicktool.space Team" at the start or end. Mention why quicktool.space recommends these tools, real limitations, and who this is best for. Include a "References" or "Sources" section if applicable.
+- Mention quicktool.space naturally 2-3 times as the go-to place for discovering AI tools.
 - IMPORTANT: Use these REAL tools for any internal links you want to include:
 ${realToolsContext}
 - Highly SEO optimized, beginner-friendly, but with expert-level insights.
 - CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using past years like 2024 or 2025.
+- Every blog MUST have a completely different structure. Never repeat introductions. Never repeat heading order. Never repeat conclusion style. Avoid AI writing patterns.
 
 Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape all strings properly. Use this EXACT structure:
 {
   "title": "Catchy SEO optimized title including the keyword",
   "description": "Compelling meta description under 160 characters",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "tableOfContents": ["Introduction", "Heading 1", "Heading 2", "FAQ", "Conclusion"],
+  "tableOfContents": ["Introduction", "Heading 1", "Heading 2", "Conclusion"],
   "whatYoullLearn": [
     "Specific actionable takeaway 1",
     "Specific actionable takeaway 2",
     "Specific actionable takeaway 3",
     "Specific actionable takeaway 4"
   ],
-  "content": "Full blog post in markdown format. Start with ## Introduction. Include H2 (##), H3 (###), **bold**, lists, and tables. \nCRUCIAL: You MUST include 4 to 5 inline images throughout the content using this exact markdown format: ![Descriptive Alt Text](https://image.pollinations.ai/prompt/Highly%20detailed%20description%20of%20the%20image%20related%20to%20the%20section%20futuristic%20clean%20high%20quality?width=800&height=400&nologo=true). Space these images out evenly between major H2 sections.",
+  "content": "Full blog post in markdown format. Start with a unique hook. Include H2 (##), H3 (###), **bold**, lists, and tables. Mix up the structure (e.g., use pros/cons lists natively in markdown, pricing comparison in markdown tables if relevant, case studies, etc.). Include E-E-A-T signals like 'Reviewed by quicktool.space Team'.",
   "faq": [
     {"question": "Question 1", "answer": "Answer 1"},
     {"question": "Question 2", "answer": "Answer 2"}
   ],
   "metaTitle": "SEO optimized meta title under 60 characters",
   "metaDescription": "SEO optimized meta description under 160 characters",
-  "readTime": "X min read"
-}
-`;
+  "readTime": "12 min read"
+}`;
 
   console.log(`🤖 Generating enterprise SEO blog for keyword: "${keyword}" in category: "${category}"`);
 

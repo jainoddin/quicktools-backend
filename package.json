@@ -30,7 +30,8 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "puppeteer": "^25.3.0",
-    "razorpay": "^2.9.6"
+    "razorpay": "^2.9.6",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

@@ -82,80 +82,79 @@ export async function generateArticle(): Promise<any> {
       console.error("Could not load tools_data.json for internal links", e);
     }
 
-    const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for QuickTools.ai — a premium platform for AI tools.
-
-Write a concise, engaging, and high-quality ARTICLE around this keyword or generate a completely fresh topic if requested:
+    const prompt = `You are a Senior SEO Content Strategist, Expert Copywriter, and AI Analyst writing for quicktool.space — a premium platform for AI tools.
+Write a concise, engaging, and high-quality ARTICLE around this keyword or generate a completely fresh topic if requested.
+Use original opinions, mention limitations, compare tools, give recommendations. Don't sound like AI. Don't repeat sentence patterns.
 Primary Keyword: ${keyword}
 Previously Used Topics (DO NOT REPEAT THESE): ${usedKeywords.join(', ')}
 
 This article MUST strictly follow ALL of these rules:
 
-CONTENT REQUIREMENTS:
-1. Strong SEO Title (50–60 characters) — keyword at the start. It MUST be 100% unique from the Previously Used Topics.
-2. Meta Description (140–160 characters) — make it completely unique, compelling, and click-worthy. STRICTLY AVOID generic templates like "A comprehensive guide and review about..." or "Discover the best tools...".
-3. Length: 800–1200 words maximum. Be concise, punchy, and avoid unnecessary filler.
-4. One H1 only (your title). Do NOT repeat it in the content body.
-5. Strong Introduction (H2): State the problem, the solution, and what readers will learn. 100–150 words maximum.
-6. "What You'll Learn" — a bullet list of 3–4 key takeaways immediately after the intro.
-7. 3–4 H2 sections maximum, keeping paragraphs short (2-3 sentences each).
-8. Include practical examples, real use cases, and actionable tips throughout.
-9. Include a dedicated "Top Tips" section with 3 short numbered tips.
-10. Comparison Table (Tool, Pricing, Best For, Rating out of 5).
-11. Pros & Cons for the main tools/approaches discussed.
-12. 3 FAQs maximum at the end (before Conclusion).
-13. Strong Conclusion: Summary + final recommendation + call to action.
-14. Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone.
-15. Keyword density 1–2%. No stuffing.
-16. E-E-A-T signals: Mention why QuickTools.ai recommends these tools, real limitations, and who this is best for.
-17. Naturally mention QuickTools.ai 2–3 times as the go-to AI tools platform.
-18. CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
+SEARCH INTENT & DEDUPLICATION (CRITICAL):
+Before writing, classify the keyword by search intent against the Previously Used Topics.
+If a previously used topic already covers the same search intent (e.g., "Best AI Writer" covers "Top AI Writer"), DO NOT generate an article with the same intent. 
+Instead, instantly pivot and generate a different keyword with a completely different search intent (e.g., "AI Writers for Students", "AI Writers vs ChatGPT", or "How AI Writers Work").
+Avoid synonyms like: Best, Top, Leading, Ultimate, Complete Guide, Review when they target the same query.
 
+CONTENT & SEO REQUIREMENTS:
+1. Strong SEO Title (50–60 characters) — keyword at the start. It MUST be 100% unique from the Previously Used Topics.
+2. Meta Description (140–160 characters) — make it completely unique, compelling, and click-worthy. STRICTLY AVOID generic templates.
+3. Length: 1800–2500 words. Dive deep, be comprehensive, and avoid unnecessary filler.
+4. One H1 only (your title). Do NOT repeat it in the content body.
+5. Structure MUST BE RANDOMIZED. Do NOT use the exact same template for every article. Mix it up: include a case study, a checklist, common mistakes, or a workflow.
+6. Include one original insight and one practical example that differs from previous articles.
+7. Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone. Write as if written by a human editor with first-hand experience.
+8. Keyword density 1–2%. No stuffing.
+9. E-E-A-T signals: Add a "Last Updated: [Current Month/Year]" and "Reviewed by quicktool.space Team" at the start or end. Mention why quicktool.space recommends these tools, real limitations, and who this is best for. Include a "References" or "Sources" section if applicable.
+10. Naturally mention quicktool.space 2–3 times as the go-to AI tools platform.
+11. CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
+12. Every article MUST have a completely different structure. Never repeat introductions. Never repeat heading order. Never repeat conclusion style. Avoid AI writing patterns.
 
 INTERNAL LINKS (very important for SEO):
-Suggest 5–8 internal link anchor texts + their QuickTools.ai paths. 
+Suggest 5–8 internal link anchor texts + their quicktool.space paths. 
 CRUCIAL: You MUST ONLY select links from the following list of REAL tools on our platform. Do NOT invent fake URLs:
 ${realToolsContext}
 Include these as a separate JSON field called "internalLinks" where "path" is the tool URL.
 
 EXTERNAL LINKS:
-Suggest 3–5 authoritative external links. Use ONLY official sites like openai.com, anthropic.com, ai.google, github.com/features/copilot.
+Suggest 3–8 authoritative external links. Use ONLY official sites like openai.com, anthropic.com, ai.google, microsoft.com, github.com, huggingface.co.
 Include as a separate JSON field called "externalLinks".
 
 STRICT JSON RULES:
 - Return ONLY a valid JSON object.
-- CRUCIAL: You MUST escape all double quotes inside the string values properly (e.g. use \\\" instead of raw double quotes).
+- CRUCIAL: You MUST escape all double quotes inside the string values properly (e.g. use \\" instead of raw double quotes).
 - Do not include any comments or trailing commas.
 
-Return STRICTLY a JSON object matching this EXACT structure:
+Return STRICTLY a JSON object matching this EXACT structure (but vary the content of 'content' block significantly):
 {
   "title": "SEO Title (50-60 chars, keyword first)",
   "metaTitle": "Same as title",
   "metaDescription": "Unique, non-templated, compelling 140-160 char meta description",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
-  "readTime": "10 min read",
+  "readTime": "15 min read",
   "whatYoullLearn": [
     "Key takeaway 1",
     "Key takeaway 2",
     "Key takeaway 3"
   ],
-  "content": "Full markdown article body. Start with ## Introduction. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, blockquotes (> text). \nCRUCIAL: You MUST include 4 inline images throughout the content using this exact markdown format: ![Alt](https://image.pollinations.ai/prompt/Highly%20detailed%20description?width=800&height=400&nologo=true).",
+  "content": "Full markdown article body. Start with a unique hook. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, blockquotes (> text). Mix up the structure (e.g., use pros/cons lists natively in markdown, pricing comparison in markdown tables if relevant, case studies, etc.). Include E-E-A-T signals like 'Reviewed by quicktool.space Team'.",
   "tableOfContents": [
-    { "id": 1, "title": "Introduction" },
-    { "id": 2, "title": "Section Heading" }
+    { "id": 1, "title": "First Unique Heading" },
+    { "id": 2, "title": "Second Unique Heading" }
   ],
   "prosAndCons": {
     "pros": ["Pro 1", "Pro 2", "Pro 3"],
     "cons": ["Con 1", "Con 2", "Con 3"]
   },
   "comparisonTable": {
-    "headers": ["Tool", "Pricing", "Best For", "Rating"],
+    "headers": ["Feature/Tool", "Detail 1", "Detail 2", "Detail 3"],
     "rows": [
-      ["Tool A", "Free / $10/mo", "Beginners", "4.8/5"],
-      ["Tool B", "$20/mo", "Professionals", "4.9/5"]
+      ["Item A", "Data 1", "Data 2", "Data 3"],
+      ["Item B", "Data 1", "Data 2", "Data 3"]
     ]
   },
   "faq": [
-    { "question": "Question 1?", "answer": "Detailed answer 1." }
+    { "question": "Unique Question 1?", "answer": "Detailed answer 1." }
   ],
   "internalLinks": [
     { "anchor": "AI Image", "path": "/tools/ai-image-generator" }
@@ -165,110 +164,110 @@ Return STRICTLY a JSON object matching this EXACT structure:
   ]
 }`;
 
-    let jsonString: string | undefined = undefined;
-    try {
-      let rawText = await runWithFailover(async (genAI: any, modelName: string) => {
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-            responseMimeType: 'application/json'
-          }
-        });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-      });
-
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in Gemini response');
-      }
-
-      jsonString = jsonMatch[0];
-
-      jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
-        return match
-          .replace(/\n/g, '\\n')
-          .replace(/\r/g, '\\r')
-          .replace(/\t/g, '\\t');
-      });
-
-      const parsedContent = JSON.parse(jsonString);
-
-      const toc = parsedContent.tableOfContents.map((item: any, index: number) => ({
-        id: index + 1,
-        title: item.title,
-        isActive: index === 0
-      }));
-
-      // ── Post-Processing: Strip any invalid tool links AI may have invented ──
-      let cleanContent = parsedContent.content;
-      if (validToolSlugs.size > 0) {
-        // Remove markdown links to non-existent tool pages: [anchor](https://quicktool.space/tools/bad-slug)
-        cleanContent = cleanContent.replace(
-          /\[([^\]]+)\]\(https?:\/\/quicktool\.space\/tools\/([a-zA-Z0-9-]+)\)/g,
-          (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
-        );
-        // Also strip relative /tools/ links
-        cleanContent = cleanContent.replace(
-          /\[([^\]]+)\]\(\/tools\/([a-zA-Z0-9-]+)\)/g,
-          (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
-        );
-      }
-
-      // Filter internalLinks to only valid slugs
-      const validInternalLinks = (parsedContent.internalLinks || []).filter((link: any) => {
-        const slug = link.path?.split('/').pop();
-        return slug && (validToolSlugs.size === 0 || validToolSlugs.has(slug));
-      });
-
-      return {
-        slug: generateSlug(parsedContent.title),
-        title: parsedContent.title,
-        description: parsedContent.metaDescription,
-        category: category,
-        tags: parsedContent.tags,
-        coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
-        author: {
-          name: 'QuickTools AI Team',
-          avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',
-          isVerified: true,
-          bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
-        },
-        readTime: parsedContent.readTime || '10 min read',
-        publishedAt: new Date(),
-        views: `0 views`,
-
-        content: cleanContent,
-        tableOfContents: toc,
-        whatYoullLearn: parsedContent.whatYoullLearn || [],
-
-        prosAndCons: parsedContent.prosAndCons || { pros: [], cons: [] },
-        comparisonTable: parsedContent.comparisonTable || { headers: [], rows: [] },
-        faq: parsedContent.faq || [],
-
-        relatedSlugs: relatedSlugs,
-        internalLinks: validInternalLinks,
-        externalLinks: parsedContent.externalLinks || [],
-
-        metaTitle: parsedContent.metaTitle,
-        metaDescription: parsedContent.metaDescription
-      };
-
-    } catch (error) {
-      console.error("AI Article Generation Error:", error);
+      let jsonString: string | undefined = undefined;
       try {
-        if (typeof jsonString !== 'undefined') {
-          require('fs').writeFileSync('debug_json.json', jsonString);
-          console.log('Saved debug_json.json for troubleshooting.');
+        let rawText = await runWithFailover(async (genAI: any, modelName: string) => {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 8192,
+              responseMimeType: 'application/json'
+            }
+          });
+          const result = await model.generateContent(prompt);
+          return result.response.text();
+        });
+
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('No valid JSON found in Gemini response');
         }
-      } catch (e) {
-        console.error('Failed to save debug JSON:', e);
+
+        jsonString = jsonMatch[0];
+
+        jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
+          return match
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t');
+        });
+
+        const parsedContent = JSON.parse(jsonString);
+
+        const toc = parsedContent.tableOfContents.map((item: any, index: number) => ({
+          id: index + 1,
+          title: item.title,
+          isActive: index === 0
+        }));
+
+        // ── Post-Processing: Strip any invalid tool links AI may have invented ──
+        let cleanContent = parsedContent.content;
+        if (validToolSlugs.size > 0) {
+          // Remove markdown links to non-existent tool pages: [anchor](https://quicktool.space/tools/bad-slug)
+          cleanContent = cleanContent.replace(
+            /\[([^\]]+)\]\(https?:\/\/quicktool\.space\/tools\/([a-zA-Z0-9-]+)\)/g,
+            (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+          );
+          // Also strip relative /tools/ links
+          cleanContent = cleanContent.replace(
+            /\[([^\]]+)\]\(\/tools\/([a-zA-Z0-9-]+)\)/g,
+            (match: string, anchor: string, slug: string) => validToolSlugs.has(slug) ? match : anchor
+          );
+        }
+
+        // Filter internalLinks to only valid slugs
+        const validInternalLinks = (parsedContent.internalLinks || []).filter((link: any) => {
+          const slug = link.path?.split('/').pop();
+          return slug && (validToolSlugs.size === 0 || validToolSlugs.has(slug));
+        });
+
+        return {
+          slug: generateSlug(parsedContent.title),
+          title: parsedContent.title,
+          description: parsedContent.metaDescription,
+          category: category,
+          tags: parsedContent.tags,
+          coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
+          author: {
+            name: 'QuickTools AI Team',
+            avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',
+            isVerified: true,
+            bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
+          },
+          readTime: parsedContent.readTime || '10 min read',
+          publishedAt: new Date(),
+          views: `0 views`,
+
+          content: cleanContent,
+          tableOfContents: toc,
+          whatYoullLearn: parsedContent.whatYoullLearn || [],
+
+          prosAndCons: parsedContent.prosAndCons || { pros: [], cons: [] },
+          comparisonTable: parsedContent.comparisonTable || { headers: [], rows: [] },
+          faq: parsedContent.faq || [],
+
+          relatedSlugs: relatedSlugs,
+          internalLinks: validInternalLinks,
+          externalLinks: parsedContent.externalLinks || [],
+
+          metaTitle: parsedContent.metaTitle,
+          metaDescription: parsedContent.metaDescription
+        };
+
+      } catch (error) {
+        console.error("AI Article Generation Error:", error);
+        try {
+          if (typeof jsonString !== 'undefined') {
+            require('fs').writeFileSync('debug_json.json', jsonString);
+            console.log('Saved debug_json.json for troubleshooting.');
+          }
+        } catch (e) {
+          console.error('Failed to save debug JSON:', e);
+        }
+        throw error;
       }
-      throw error;
-    }
-  } finally {
-    await CronLock.deleteOne({ key: 'article_generator' });
+    } finally {
+      await CronLock.deleteOne({ key: 'article_generator' });
   }
 }

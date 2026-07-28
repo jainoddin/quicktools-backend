@@ -40,6 +40,10 @@ export interface IArticle extends Document {
   // SEO Meta
   metaTitle: string;
   metaDescription: string;
+  
+  // SEO Future-Proofing
+  redirectUrl?: string;
+  canonicalOverride?: string;
 }
 
 const ArticleSchema = new Schema<IArticle>(
@@ -100,6 +104,8 @@ const ArticleSchema = new Schema<IArticle>(
 
     metaTitle: { type: String, required: true },
     metaDescription: { type: String, required: true },
+    redirectUrl: { type: String },
+    canonicalOverride: { type: String },
   },
   { timestamps: true }
 );
