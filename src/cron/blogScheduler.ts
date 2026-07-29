@@ -115,7 +115,7 @@ export function startCronJobs() {
       // Enforce exactly 1 blog per day
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
-      const existingToday = await Blog.findOne({ publishedAt: { $gte: startOfDay } });
+      const existingToday = await Blog.findOne({ createdAt: { $gte: startOfDay } });
       if (existingToday) {
         console.log('⚠️ Blog already generated today. Skipping.');
         return;
@@ -159,7 +159,7 @@ export function startCronJobs() {
       // Enforce exactly 1 article per day
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
-      const existingToday = await Article.findOne({ publishedAt: { $gte: startOfDay } });
+      const existingToday = await Article.findOne({ createdAt: { $gte: startOfDay } });
       if (existingToday) {
         console.log('⚠️ Article already generated today. Skipping.');
         return;
@@ -286,7 +286,7 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
     // Enforce exactly required news per day to prevent duplicate retries
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const newsCountToday = await News.countDocuments({ publishedAt: { $gte: startOfDay } });
+    const newsCountToday = await News.countDocuments({ createdAt: { $gte: startOfDay } });
 
     if (timeSlot === 'Morning' && newsCountToday >= 1) {
       console.log('⚠️ Morning News already generated today. Skipping.');
