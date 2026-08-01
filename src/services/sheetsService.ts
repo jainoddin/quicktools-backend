@@ -18,7 +18,12 @@ export const appendDailyReportRow = async (
   }
 ) => {
   try {
-    const creds = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+    let creds;
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    } else {
+      creds = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+    }
 
     // Initialize auth
     const serviceAccountAuth = new JWT({
@@ -34,9 +39,9 @@ export const appendDailyReportRow = async (
     const monthNames = ["January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"];
     
-    // Get the date in IST timezone to ensure correct month alignment
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const sheetName = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    // Parse the date (e.g. "2026-07-05") to get correct month tab
+    const rowDate = new Date(rowData.date);
+    const sheetName = `${monthNames[rowDate.getMonth()]} ${rowDate.getFullYear()}`;
 
     // Find or create sheet
     let sheet = doc.sheetsByTitle[sheetName];

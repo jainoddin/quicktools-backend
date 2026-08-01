@@ -1,21 +1,31 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import path from 'path';
 
-// Path to the service account key file (works for both src/ and dist/ structures)
-const keyFilename = path.join(__dirname, '../../google-service-account.json');
+import fs from 'fs';
 
-const analyticsDataClient = new BetaAnalyticsDataClient({
-  keyFilename,
-});
+let analyticsDataClient: BetaAnalyticsDataClient;
 
-export const getDailyGA4Metrics = async (propertyId: string) => {
+if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  analyticsDataClient = new BetaAnalyticsDataClient({
+    credentials: {
+      client_email: creds.client_email,
+      private_key: creds.private_key,
+    }
+  });
+} else {
+  const keyFilename = path.join(__dirname, '../../google-service-account.json');
+  analyticsDataClient = new BetaAnalyticsDataClient({ keyFilename });
+}
+
+export const getDailyGA4Metrics = async (propertyId: string, dateStr: string = 'today') => {
   try {
     const [response] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [
         {
-          startDate: 'today',
-          endDate: 'today',
+          startDate: dateStr,
+          endDate: dateStr,
         },
       ],
       metrics: [
