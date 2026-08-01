@@ -24,6 +24,12 @@ const getKolkataDateString = () => {
   return formatter.format(d);
 };
 
+// Helper to get start of day in Asia/Kolkata timezone
+const getKolkataStartOfDay = () => {
+  const dateStr = getKolkataDateString();
+  return new Date(`${dateStr}T00:00:00+05:30`);
+};
+
 // Helper function to handle cron failure logs and single email alerts per day
 async function handleCronFailure(type: string, error: any) {
   try {
@@ -94,6 +100,7 @@ export function startCronJobs() {
       return result === null;
     } catch (err) {
       console.error('Error acquiring lock:', err);
+      await handleCronFailure(`database_lock_${key}`, err);
       return false;
     }
   };
@@ -102,7 +109,7 @@ export function startCronJobs() {
   cron.schedule('2-59/5 9-23 * * *', async () => {
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getKolkataDateString();
     const lockKey = `blog-${todayStr}`;
     try {
       
@@ -113,8 +120,7 @@ export function startCronJobs() {
       }
 
       // Enforce exactly 1 blog per day
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDay = getKolkataStartOfDay();
       const existingToday = await Blog.findOne({ createdAt: { $gte: startOfDay } });
       if (existingToday) {
         console.log('⚠️ Blog already generated today. Skipping.');
@@ -146,7 +152,7 @@ export function startCronJobs() {
   cron.schedule('2-59/5 21-23 * * *', async () => {
     console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getKolkataDateString();
     const lockKey = `article-${todayStr}`;
     try {
       
@@ -157,8 +163,7 @@ export function startCronJobs() {
       }
 
       // Enforce exactly 1 article per day
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDay = getKolkataStartOfDay();
       const existingToday = await Article.findOne({ createdAt: { $gte: startOfDay } });
       if (existingToday) {
         console.log('⚠️ Article already generated today. Skipping.');
@@ -224,7 +229,7 @@ export function startCronJobs() {
   cron.schedule('0 10 * * *', async () => {
     console.log('⏰ Marketing Email cron triggered at', new Date().toISOString());
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getKolkataDateString();
       const lockKey = `marketing-email-${todayStr}`;
       
       const hasLock = await acquireLock(lockKey);
@@ -274,7 +279,7 @@ export function startCronJobs() {
 
 // Helper function to generate exactly 1 news item per slot
 async function generateSingleNewsJob(timeSlot: string, failureType: string, acquireLock: (key: string) => Promise<boolean>) {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getKolkataDateString();
   const lockKey = `news-${timeSlot}-${todayStr}`;
   try {
     
@@ -284,8 +289,7 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
       return;
     }
     // Enforce exactly required news per day to prevent duplicate retries
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = getKolkataStartOfDay();
     const newsCountToday = await News.countDocuments({ createdAt: { $gte: startOfDay } });
 
     if (timeSlot === 'Morning' && newsCountToday >= 1) {
@@ -327,7 +331,7 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
 
 // Helper function to execute and lock Social Media Jobs with retry
 async function executeSocialMediaJob(timeSlot: string, acquireLock: (key: string) => Promise<boolean>) {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getKolkataDateString();
   const lockKey = `social-media-${timeSlot.toLowerCase()}-${todayStr}`;
   try {
     const hasLock = await acquireLock(lockKey);

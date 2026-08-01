@@ -21,6 +21,7 @@ import helmet from 'helmet';
 import './services/auth.service'; // Register passport strategies
 import { startCronJobs } from './cron/blogScheduler';
 import { startSocialMediaCron } from './cron/socialMediaScheduler';
+import { startReportingCron } from './cron/reportingScheduler';
 import rateLimit from 'express-rate-limit';
 import { FRONTEND_URL, PORT, isProd } from './config/env';
 
@@ -124,6 +125,7 @@ const start = async () => {
   await connectDB();
   startCronJobs();
   startSocialMediaCron();
+  startReportingCron();
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Backend running on http://localhost:${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/blogs`);

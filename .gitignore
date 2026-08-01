@@ -5,3 +5,4 @@ dist
 check_payments.js
 link_payments.js
 update_plan.js
+google-service-account.json
