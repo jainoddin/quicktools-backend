@@ -288,21 +288,30 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
       console.log(`⚠️ ${timeSlot} News lock already acquired by another process today. Skipping.`);
       return;
     }
-    // Enforce exactly required news per day to prevent duplicate retries
-    const startOfDay = getKolkataStartOfDay();
-    const newsCountToday = await News.countDocuments({ createdAt: { $gte: startOfDay } });
-
-    if (timeSlot === 'Morning' && newsCountToday >= 1) {
-      console.log('⚠️ Morning News already generated today. Skipping.');
-      return;
-    }
-    if (timeSlot === 'Afternoon' && newsCountToday >= 2) {
-      console.log('⚠️ Afternoon News already generated today. Skipping.');
-      return;
-    }
-    if (timeSlot === 'Night' && newsCountToday >= 3) {
-      console.log('⚠️ Night News already generated today. Skipping.');
-      return;
+    // Prevent duplicate generations by checking if this specific slot already succeeded
+    const dateStr = getKolkataDateString();
+    
+    if (timeSlot === 'Morning') {
+      const startOfDay = new Date(`${dateStr}T00:00:00+05:30`);
+      const hasMorning = await News.findOne({ createdAt: { $gte: startOfDay }, isBreaking: true });
+      if (hasMorning) {
+        console.log('⚠️ Morning News already generated today. Skipping.');
+        return;
+      }
+    } else if (timeSlot === 'Afternoon') {
+      const startOfAfternoon = new Date(`${dateStr}T12:30:00+05:30`);
+      const hasAfternoon = await News.findOne({ createdAt: { $gte: startOfAfternoon } });
+      if (hasAfternoon) {
+        console.log('⚠️ Afternoon News already generated today. Skipping.');
+        return;
+      }
+    } else if (timeSlot === 'Night') {
+      const startOfNight = new Date(`${dateStr}T19:30:00+05:30`);
+      const hasNight = await News.findOne({ createdAt: { $gte: startOfNight } });
+      if (hasNight) {
+        console.log('⚠️ Night News already generated today. Skipping.');
+        return;
+      }
     }
 
     const newsData = await generateNews();
