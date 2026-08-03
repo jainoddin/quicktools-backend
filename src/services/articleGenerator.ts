@@ -1,6 +1,6 @@
 import { Article } from '../models/Article';
-import { generateAndUploadImage } from './r2.service';
 import { runWithFailover } from './geminiClient';
+import { classifySearchIntent } from './contentQualityPipeline';
 
 const ARTICLE_KEYWORDS = [
   { keyword: "Best AI Resume Builders", category: "AI & Tools" },
@@ -23,6 +23,25 @@ function generateSlug(title: string): string {
     .replace(/\s+/g, '-')         // spaces → hyphens
     .replace(/-+/g, '-')          // collapse double hyphens
     .trim();
+}
+
+function extractFirstJsonObject(value: string): string {
+  const start = value.indexOf('{');
+  if (start < 0) throw new Error('No valid JSON found in Gemini response');
+  let depth = 0, inString = false, escaped = false;
+  for (let i = start; i < value.length; i++) {
+    const char = value[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return value.slice(start, i + 1);
+  }
+  throw new Error('Incomplete JSON object in Gemini response');
 }
 
 import fs from 'fs';
@@ -57,9 +76,11 @@ export async function generateArticle(): Promise<any> {
         category: "AI & Tools"
       };
     } else {
-      randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+      const dailySeed = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''));
+      randomTopic = availableKeywords[dailySeed % availableKeywords.length];
     }
     const { keyword, category } = randomTopic;
+    const searchIntent = await classifySearchIntent(keyword, 'article');
 
     let relatedArticles = existingArticles.filter(a => a.category === category);
     if (relatedArticles.length < 3) {
@@ -86,6 +107,7 @@ export async function generateArticle(): Promise<any> {
 Write a concise, engaging, and high-quality ARTICLE around this keyword or generate a completely fresh topic if requested.
 Use original opinions, mention limitations, compare tools, give recommendations. Don't sound like AI. Don't repeat sentence patterns.
 Primary Keyword: ${keyword}
+Search Intent: ${searchIntent}. Select a title pattern and content structure that directly matches this intent.
 Previously Used Topics (DO NOT REPEAT THESE): ${usedKeywords.join(', ')}
 
 This article MUST strictly follow ALL of these rules:
@@ -99,16 +121,20 @@ Avoid synonyms like: Best, Top, Leading, Ultimate, Complete Guide, Review when t
 CONTENT & SEO REQUIREMENTS:
 1. Strong SEO Title (50–60 characters) — keyword at the start. It MUST be 100% unique from the Previously Used Topics.
 2. Meta Description (140–160 characters) — make it completely unique, compelling, and click-worthy. STRICTLY AVOID generic templates.
-3. Length: 1800–2500 words. Dive deep, be comprehensive, and avoid unnecessary filler.
+3. Length: 1150-1500 words (hard acceptable range 1000-1800). Count the markdown body words before returning JSON. Be comprehensive without filler.
 4. One H1 only (your title). Do NOT repeat it in the content body.
-5. Structure MUST BE RANDOMIZED. Do NOT use the exact same template for every article. Mix it up: include a case study, a checklist, common mistakes, or a workflow.
+5. Structure MUST BE RANDOMIZED. Do NOT use the exact same template for every article. Mix it up with a checklist, common mistakes, decision framework, or workflow. Never invent a case study.
 6. Include one original insight and one practical example that differs from previous articles.
-7. Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone. Write as if written by a human editor with first-hand experience.
+7. Clear editorial style. STRICTLY AVOID invented first-hand experience and phrases such as "In today's digital world", "As an AI language model", "In conclusion", or "It's worth noting".
 8. Keyword density 1–2%. No stuffing.
-9. E-E-A-T signals: Add a "Last Updated: [Current Month/Year]" and "Reviewed by quicktool.space Team" at the start or end. Mention why quicktool.space recommends these tools, real limitations, and who this is best for. Include a "References" or "Sources" section if applicable.
-10. Naturally mention quicktool.space 2–3 times as the go-to AI tools platform.
-11. CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
-12. Every article MUST have a completely different structure. Never repeat introductions. Never repeat heading order. Never repeat conclusion style. Avoid AI writing patterns.
+9. Do not put editorial notes, AI disclosures, or review-process text inside the article body; the page UI displays the AI-assistance disclosure separately. Never claim manual review or personal testing unless supplied as source context. Include a References or Sources section for factual claims.
+10. FACT SAFETY: No invented statistics, percentages, benchmarks, surveys, quotations, customer outcomes, named standards, or references. Without supplied sources, use qualitative explanations and clearly framed recommendations only.
+   - Do not write any percentage, cost-saving figure, performance number, market size, adoption figure, or benchmark. Years and numbered workflow steps are the only allowed numeric claims.
+   - Never describe future/current market conditions as established fact. Use timeless practical guidance.
+   - A References/Sources section may list only the exact official URLs selected in externalLinks; never invent paper titles, report names, authors, or research findings.
+11. Mention quicktool.space naturally at most once in prose. Include no more than 2 inline QuickTools links in the article body; keep other recommendations only in the separate internalLinks field.
+12. CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using 2024 or 2025.
+13. Every article MUST have a completely different structure. Never repeat introductions. Never repeat heading order. Never repeat conclusion style. Avoid AI writing patterns.
 
 INTERNAL LINKS (very important for SEO):
 Suggest 5–8 internal link anchor texts + their quicktool.space paths. 
@@ -137,7 +163,7 @@ Return STRICTLY a JSON object matching this EXACT structure (but vary the conten
     "Key takeaway 2",
     "Key takeaway 3"
   ],
-  "content": "Full markdown article body. Start with a unique hook. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, blockquotes (> text). Mix up the structure (e.g., use pros/cons lists natively in markdown, pricing comparison in markdown tables if relevant, case studies, etc.). Include E-E-A-T signals like 'Reviewed by quicktool.space Team'.",
+  "content": "Full 1150-1500 word markdown article body. Start with a unique hook. Include H2 (##), H3 (###), **bold**, *italic*, bullet lists, blockquotes (> text). Match the structure to search intent, use at most 2 inline QuickTools links, and avoid promotional repetition.",
   "tableOfContents": [
     { "id": 1, "title": "First Unique Heading" },
     { "id": 2, "title": "Second Unique Heading" }
@@ -179,12 +205,7 @@ Return STRICTLY a JSON object matching this EXACT structure (but vary the conten
           return result.response.text();
         });
 
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('No valid JSON found in Gemini response');
-        }
-
-        jsonString = jsonMatch[0];
+        jsonString = extractFirstJsonObject(rawText);
 
         jsonString = (jsonString as string).replace(/"([^"\\]|\\.)*"/g, (match) => {
           return match
@@ -223,12 +244,14 @@ Return STRICTLY a JSON object matching this EXACT structure (but vary the conten
         });
 
         return {
+          topic: keyword,
+          searchIntent,
           slug: generateSlug(parsedContent.title),
           title: parsedContent.title,
           description: parsedContent.metaDescription,
           category: category,
           tags: parsedContent.tags,
-          coverImage: await generateAndUploadImage(parsedContent.title, 'article_covers'),
+          coverImage: '',
           author: {
             name: 'QuickTools AI Team',
             avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',

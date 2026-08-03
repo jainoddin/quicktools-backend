@@ -1,7 +1,7 @@
 import { runWithFailover } from './geminiClient';
 import { Blog } from '../models/Blog';
 import { Subscriber } from '../models/Subscriber';
-import { generateAndUploadImage } from './r2.service';
+import { classifySearchIntent } from './contentQualityPipeline';
 
 const SEO_KEYWORDS = [
   { keyword: "Best AI Tools", category: "AI & Tools" },
@@ -68,9 +68,11 @@ export async function generateBlog(): Promise<any> {
       category: "AI & Tools"
     };
   } else {
-    randomTopic = availableKeywords[Math.floor(Math.random() * availableKeywords.length)];
+    const dailySeed = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''));
+    randomTopic = availableKeywords[dailySeed % availableKeywords.length];
   }
   const { keyword, category } = randomTopic;
+  const searchIntent = await classifySearchIntent(keyword, 'blog');
 
   // 4. Get Related Posts (Auto Related Posts)
   // Get 3 random blogs from the same category, or just any category if not enough
@@ -100,17 +102,19 @@ export async function generateBlog(): Promise<any> {
 Write a comprehensive, engaging, and high-quality blog around this keyword.
 Use original opinions, mention limitations, compare tools, give recommendations. Don't sound like AI. Don't repeat sentence patterns.
 Primary Keyword: ${keyword}
+Search Intent: ${searchIntent}. Match the title, structure, and CTA to this intent.
 Previously Used Topics (DO NOT REPEAT THESE): ${usedKeywords.join(', ')}
 
 Requirements:
 - SEARCH INTENT & DEDUPLICATION (CRITICAL): Before writing, classify the keyword by search intent against the Previously Used Topics. If a previously used topic already covers the same search intent (e.g., "Best AI Writer" covers "Top AI Writer"), DO NOT generate a blog with the same intent. Instead, instantly pivot and generate a different keyword with a completely different search intent (e.g., "AI Writers for Students", "AI Writers vs ChatGPT", or "How AI Writers Work"). Avoid synonyms like: Best, Top, Leading, Ultimate, Complete Guide, Review when they target the same query.
-- 1200-1800 words minimum. Dive deep but be concise.
+- TARGET 1400-1700 words for the markdown content body. Hard minimum 1250 words and hard maximum 1800 words. Count the body before returning JSON; expand practical examples if it is short.
 - Structure MUST BE RANDOMIZED. Do NOT use the exact same template for every blog. Mix it up: include a case study, a checklist, common mistakes, or a workflow.
 - Include one original insight and one practical example that differs from previous blogs.
 - Human writing style ONLY. STRICTLY AVOID: "In today's digital world", "As an AI language model", "In conclusion", "It's worth noting". Use conversational, expert tone. Write as if written by a human editor with first-hand experience.
 - Original and captivating introduction.
 - Clear H2 and H3 headings.
-- E-E-A-T signals: Add a "Last Updated: [Current Month/Year]" and "Reviewed by quicktool.space Team" at the start or end. Mention why quicktool.space recommends these tools, real limitations, and who this is best for. Include a "References" or "Sources" section if applicable.
+- Transparency: Add "AI-assisted content. Automatically reviewed by the QuickTools Quality Pipeline." Never claim manual review or first-hand testing unless supported in supplied context. Include a References or Sources section for factual claims.
+- FACT SAFETY: No invented statistics, percentages, benchmarks, surveys, quotations, case-study results, named standards, customer outcomes, or claims about quicktool.space internal observations. Because no research sources are supplied, use qualitative explanations and clearly framed recommendations only. Do not fabricate a References section.
 - Mention quicktool.space naturally 2-3 times as the go-to place for discovering AI tools.
 - IMPORTANT: Use these REAL tools for any internal links you want to include:
 ${realToolsContext}
@@ -130,7 +134,7 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
     "Specific actionable takeaway 3",
     "Specific actionable takeaway 4"
   ],
-  "content": "Full blog post in markdown format. Start with a unique hook. Include H2 (##), H3 (###), **bold**, lists, and tables. Mix up the structure (e.g., use pros/cons lists natively in markdown, pricing comparison in markdown tables if relevant, case studies, etc.). Include E-E-A-T signals like 'Reviewed by quicktool.space Team'.",
+  "content": "Full blog post in markdown format. Start with a unique hook. Include H2 (##), H3 (###), **bold**, lists, and tables. Match the structure to search intent and end with the required AI-assistance transparency statement.",
   "faq": [
     {"question": "Question 1", "answer": "Answer 1"},
     {"question": "Question 2", "answer": "Answer 2"}
@@ -194,12 +198,14 @@ Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape
   }
 
   return {
+    topic: keyword,
+    searchIntent,
     slug,
     title: generated.title,
     description: generated.description,
     category,
     tags: generated.tags || [],
-    coverImage: await generateAndUploadImage(generated.title, 'blog_covers'),
+    coverImage: '',
     author: {
       name: 'QuickTools AI',
       avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',

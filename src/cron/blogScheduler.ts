@@ -11,24 +11,21 @@ import { generateNews } from '../services/newsGenerator';
 import { sendAdminNotificationEmail } from '../services/emailService';
 import { generateAndSendMarketingEmail } from '../services/marketingGenerator';
 import { generateAndPostToSocialMedia } from '../services/socialMediaGenerator';
+import { generateWithQualityGate, persistQualityAttempt, QualityResult } from '../services/contentQualityPipeline';
+import { attachValidatedImage } from '../services/imageQualityPipeline';
+import { getKolkataDateString, getKolkataStartOfDay } from '../utils/contentSchedule';
 
 // Helper to get current date string in Asia/Kolkata timezone (YYYY-MM-DD)
-const getKolkataDateString = () => {
-  const d = new Date();
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+async function logQualitySkip(type: string, reviews: QualityResult[]) {
+  const last = reviews[reviews.length - 1];
+  await CronFailure.create({
+    type: `quality_${type}`,
+    error: JSON.stringify({ score: last?.score, issues: last?.issues, criticalIssues: last?.criticalIssues }),
+    emailed: false,
+    resolved: false,
   });
-  return formatter.format(d);
-};
-
-// Helper to get start of day in Asia/Kolkata timezone
-const getKolkataStartOfDay = () => {
-  const dateStr = getKolkataDateString();
-  return new Date(`${dateStr}T00:00:00+05:30`);
-};
+  console.warn(`[QualityPipeline] ${type} skipped after ${reviews.length} failed attempts.`);
+}
 
 // Helper function to handle cron failure logs and single email alerts per day
 async function handleCronFailure(type: string, error: any) {
@@ -89,6 +86,10 @@ async function handleCronFailure(type: string, error: any) {
 }
 
 export function startCronJobs() {
+  const contentAutomationEnabled = process.env.CONTENT_AUTOMATION_ENABLED === 'true';
+  if (!contentAutomationEnabled) {
+    console.warn('[ContentAutomation] Scheduled blog, article, and news publishing is disabled. Manual protected smoke-test routes remain available.');
+  }
   // Helper to acquire distributed lock
   const acquireLock = async (key: string): Promise<boolean> => {
     try {
@@ -107,6 +108,7 @@ export function startCronJobs() {
 
   // 1. Blog: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 9 AM and 11 PM IST
   cron.schedule('2-59/5 9-23 * * *', async () => {
+    if (!contentAutomationEnabled) return;
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
     const todayStr = getKolkataDateString();
@@ -127,7 +129,19 @@ export function startCronJobs() {
         return;
       }
 
-      const blogData = await generateBlog();
+      const existingTitles = (await Blog.find({}, 'title').lean()).map(item => item.title);
+      const gated = await generateWithQualityGate({ kind: 'blog', existingTitles, generate: () => generateBlog(), onAttempt: entry => persistQualityAttempt('blog', entry) });
+      if (!gated.content) {
+        await logQualitySkip('blog', gated.reviews);
+        await CronLock.deleteOne({ key: lockKey });
+        return;
+      }
+      const blogData = gated.content;
+      if (!await attachValidatedImage('blog', blogData)) {
+        console.warn('[ImagePipeline] Blog skipped after image quality gate failed.');
+        await CronLock.deleteOne({ key: lockKey });
+        return;
+      }
 
       // Avoid duplicate slugs
       const existing = await Blog.findOne({ slug: blogData.slug });
@@ -150,6 +164,7 @@ export function startCronJobs() {
 
   // 2. Article: Runs at minute 2 of every 5-minute interval between 9 PM and 11 PM IST (Night slot)
   cron.schedule('2-59/5 21-23 * * *', async () => {
+    if (!contentAutomationEnabled) return;
     console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
     const todayStr = getKolkataDateString();
@@ -170,7 +185,19 @@ export function startCronJobs() {
         return;
       }
 
-      const articleData = await generateArticle();
+      const existingTitles = (await Article.find({}, 'title').lean()).map(item => item.title);
+      const gated = await generateWithQualityGate({ kind: 'article', existingTitles, generate: () => generateArticle(), onAttempt: entry => persistQualityAttempt('article', entry) });
+      if (!gated.content) {
+        await logQualitySkip('article', gated.reviews);
+        await CronLock.deleteOne({ key: lockKey });
+        return;
+      }
+      const articleData = gated.content;
+      if (!await attachValidatedImage('article', articleData)) {
+        console.warn('[ImagePipeline] Article skipped after image quality gate failed.');
+        await CronLock.deleteOne({ key: lockKey });
+        return;
+      }
 
       const existing = await Article.findOne({ slug: articleData.slug });
       if (existing) {
@@ -192,22 +219,11 @@ export function startCronJobs() {
 
   // ─── NEWS AUTOMATION (3 TIMES A DAY) ───
 
-  // Morning News (8:02 AM IST first try, retry every 5 mins in 8:00 AM - 12:59 PM slot)
-  cron.schedule('2-59/5 8-12 * * *', async () => {
-    console.log('⏰ Morning NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Morning', 'news_morning', acquireLock);
-  }, { timezone: 'Asia/Kolkata' });
-
-  // Afternoon News (1:02 PM IST first try, retry every 5 mins in 1:00 PM - 7:59 PM slot)
-  cron.schedule('2-59/5 13-19 * * *', async () => {
+  // Afternoon News (1:02 PM IST first try, retry every 5 mins until 5:59 PM)
+  cron.schedule('2-59/5 13-17 * * *', async () => {
+    if (!contentAutomationEnabled) return;
     console.log('⏰ Afternoon NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Afternoon', 'news_afternoon', acquireLock);
-  }, { timezone: 'Asia/Kolkata' });
-
-  // Night News (8:02 PM IST first try, retry every 5 mins in 8:00 PM - 11:59 PM slot)
-  cron.schedule('2-59/5 20-23 * * *', async () => {
-    console.log('⏰ Night NEWS generation cron triggered at', new Date().toISOString());
-    await generateSingleNewsJob('Night', 'news_night', acquireLock);
+    await generateSingleNewsJob('Daily', 'news_daily', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
   // Purge accounts deactivated for more than 15 days (daily at 3:00 AM IST)
@@ -270,7 +286,7 @@ export function startCronJobs() {
     await executeSocialMediaJob('Evening', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
   console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
-  console.log('   - News:    Morning 8 AM (retry every 5 mins till 12:59 PM) | Afternoon 1 PM (retry every 5 mins till 7:59 PM) | Night 8 PM (retry every 5 mins till 11:59 PM)');
+  console.log('   - News:    Afternoon — 1:02 PM (retry every 5 mins till 5:59 PM)');
   console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
   console.log('   - Marketing Email: 10:00 AM daily');
   console.log('   - Social Media Auto-Poster: 9:30 AM, 2:30 PM, 7:30 PM daily (LinkedIn, FB, Insta)');
@@ -291,10 +307,10 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
     // Prevent duplicate generations by checking if this specific slot already succeeded
     const dateStr = getKolkataDateString();
     
-    if (timeSlot === 'Morning') {
+    if (timeSlot === 'Daily') {
       const startOfDay = new Date(`${dateStr}T00:00:00+05:30`);
-      const hasMorning = await News.findOne({ createdAt: { $gte: startOfDay }, isBreaking: true });
-      if (hasMorning) {
+      const hasDailyNews = await News.findOne({ createdAt: { $gte: startOfDay } });
+      if (hasDailyNews) {
         console.log('⚠️ Morning News already generated today. Skipping.');
         return;
       }
@@ -314,7 +330,19 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
       }
     }
 
-    const newsData = await generateNews();
+    const existingTitles = (await News.find({}, 'title').lean()).map(item => item.title);
+    const gated = await generateWithQualityGate({ kind: 'news', existingTitles, generate: () => generateNews(), onAttempt: entry => persistQualityAttempt('news', entry) });
+    if (!gated.content) {
+      await logQualitySkip('news', gated.reviews);
+      await CronLock.deleteOne({ key: lockKey });
+      return;
+    }
+    const newsData = gated.content;
+    if (!await attachValidatedImage('news', newsData)) {
+      console.warn('[ImagePipeline] News skipped after image quality gate failed.');
+      await CronLock.deleteOne({ key: lockKey });
+      return;
+    }
     const existing = await News.findOne({ slug: newsData.slug });
 
     if (existing) {
@@ -322,11 +350,7 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
     }
 
     // If it's the morning news, make it 'breaking'
-    if (timeSlot === 'Morning') {
-      newsData.isBreaking = true;
-    } else {
-      newsData.isBreaking = false;
-    }
+    newsData.isBreaking = false;
 
     const news = new News(newsData);
     await news.save();
