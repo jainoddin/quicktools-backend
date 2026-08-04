@@ -18,6 +18,9 @@ export interface IUser extends Document {
   lastGenerationDate: Date;
   bio?: string;
   customAvatar?: boolean;
+  xp: number;
+  level: number;
+  badges: string[];
   /** When set, account is deactivated. Login within 15 days reactivates; after 15 days it is permanently deleted. */
   deactivatedAt?: Date | null;
   createdAt: Date;
@@ -44,6 +47,9 @@ const UserSchema: Schema = new Schema(
     lastGenerationDate: { type: Date, default: Date.now },
     bio: { type: String, default: '' },
     customAvatar: { type: Boolean, default: false },
+    xp: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    badges: { type: [String], default: [] },
     deactivatedAt: { type: Date, default: null },
   },
   { timestamps: true }
