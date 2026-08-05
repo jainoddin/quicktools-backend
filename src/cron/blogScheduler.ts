@@ -349,10 +349,12 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
       newsData.slug = `${newsData.slug}-${Date.now()}`;
     }
 
-    // If it's the morning news, make it 'breaking'
-    newsData.isBreaking = false;
-
-    const news = new News(newsData);
+    // Make the Daily/Morning news 'breaking' so it shows up as featured on the frontend
+    if (timeSlot === 'Daily' || timeSlot === 'Morning') {
+      newsData.isBreaking = true;
+    } else {
+      newsData.isBreaking = false;
+    }
     await news.save();
     console.log(`✅ Auto-generated ${timeSlot} news: "${news.title}"`);
   } catch (error) {

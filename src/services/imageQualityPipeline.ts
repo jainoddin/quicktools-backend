@@ -58,7 +58,7 @@ export function selectImageFamily(kind: ContentKind, category: string, recent: s
 }
 
 function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
-  return `Create a premium realistic 16:9 editorial cover image for a ${kind} titled "${topic}" in the ${category} category. Visual style: ${family}. Build a concrete scene whose central subject clearly communicates the topic, with realistic materials, cinematic or natural lighting, depth, polished technology-magazine quality, clean composition, and safe margins. Make each image visually distinct. No headline, no readable text, no letters, no numbers, no company or product logos, no watermark, no fake screenshot, no unsafe content, and no identifiable person.`;
+  return `Create a premium, high-tech, futuristic 16:9 editorial cover image for a ${kind} titled "${topic}" in the ${category} category. Visual style: ${family}. If the topic mentions specific AI tools (like Google Gemini, ChatGPT, Claude, AWS, etc.), prominently feature their official logos in the center. Surround the subject with glowing holographic screens, floating UI elements, and data nodes representing AI workflows. Use realistic materials, glowing neon lights, deep colors (purple, blue, indigo), cinematic lighting, depth, and polished technology-magazine quality. Make each image visually distinct. No text labels, no readable words, no letters, no watermark, no human faces.`;
 }
 
 async function generateGeminiRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
@@ -258,13 +258,21 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
       try {
         generated = await generateGeminiRealisticImage(prompt, attempt);
       } catch (providerError) {
-        const asset = await selectRealisticLibraryAsset(input.topic, stylesAlreadyUsedToday, recentAssetKeys);
-        const response = await fetch(asset.r2Url, { signal: AbortSignal.timeout(30_000) });
-        if (!response.ok) throw new Error(`Realistic library asset unavailable (HTTP ${response.status})`);
+        if (attempt < attempts) {
+          console.log(`[ImagePipeline] Gemini API failed on attempt ${attempt} (${providerError instanceof Error ? providerError.message : String(providerError)}). Retrying...`);
+          // Wait 2 seconds before retrying to avoid immediate rate limits
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        
+        console.log(`[ImagePipeline] All ${attempts} Gemini API attempts failed. Falling back to Pollinations AI...`);
+        const seed = Math.floor(Math.random() * 1000000);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}`;
+        const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(30_000) });
+        if (!response.ok) throw new Error(`Pollinations fallback failed (HTTP ${response.status})`);
+        
         generated = { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get('content-type') || 'image/jpeg' };
-        selectedAssetKey = asset.key;
-        family = asset.family as ImageFamily;
-        prompt = `${makePrompt(input.topic, input.kind, input.category, family)} Vetted realistic library fallback after provider error: ${providerError instanceof Error ? providerError.message : String(providerError)}`;
+        prompt = `${prompt} Vetted Pollinations fallback after provider error: ${providerError instanceof Error ? providerError.message : String(providerError)}`;
       }
       const normalizedBuffer = await sharp(generated.buffer)
         .resize(1200, 630, { fit: 'cover', position: 'centre' })
