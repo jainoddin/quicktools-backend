@@ -77,13 +77,13 @@ export function deterministicReview(kind: ContentKind, content: any, existingTit
     ? [content.summary, content.whatHappened, content.whyItMatters, content.keyHighlights?.join(' '), content.industryReaction, content.quickToolsInsight, content.conclusion].filter(Boolean).join(' ')
     : String(content.content || '');
   const count = words(body).length;
-  const [minWords, maxWords] = kind === 'news' ? [250, 350] : kind === 'blog' ? [1200, 1900] : [1000, 1800];
+  const [minWords, maxWords] = kind === 'news' ? [250, 350] : kind === 'blog' ? [1200, 1900] : [800, 1800];
 
   if (!content.title || !content.slug || !body) criticalIssues.push('Missing required title, slug, or content');
   if (count < minWords || count > maxWords) criticalIssues.push(`Word count ${count} is outside ${minWords}-${maxWords}`);
   if (!content.metaTitle || content.metaTitle.length > 60) criticalIssues.push('Meta title is missing or exceeds 60 characters');
-  if (!content.metaDescription || content.metaDescription.length < 120 || content.metaDescription.length > 160) {
-    criticalIssues.push('Meta description must be 120-160 characters');
+  if (!content.metaDescription || content.metaDescription.length < 100 || content.metaDescription.length > 160) {
+    criticalIssues.push('Meta description must be 100-160 characters');
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(content.slug || ''))) criticalIssues.push('Slug is invalid');
   if (kind === 'news' && (!content.sourceName || !/^https:\/\//.test(String(content.sourceUrl || '')))) {
