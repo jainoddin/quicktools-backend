@@ -355,6 +355,7 @@ async function generateSingleNewsJob(timeSlot: string, failureType: string, acqu
     } else {
       newsData.isBreaking = false;
     }
+    const news = new News(newsData);
     await news.save();
     console.log(`✅ Auto-generated ${timeSlot} news: "${news.title}"`);
   } catch (error) {
