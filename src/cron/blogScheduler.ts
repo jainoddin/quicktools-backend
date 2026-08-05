@@ -93,6 +93,10 @@ export function startCronJobs() {
   // Helper to acquire distributed lock
   const acquireLock = async (key: string): Promise<boolean> => {
     try {
+      // Self-heal stale locks (older than 15 mins) from previous crashed runs
+      const staleCutoff = new Date(Date.now() - 15 * 60 * 1000);
+      await CronLock.deleteMany({ key, createdAt: { $lt: staleCutoff } });
+
       const result = await CronLock.findOneAndUpdate(
         { key },
         { $setOnInsert: { key, createdAt: new Date() } },
