@@ -268,11 +268,17 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         console.log(`[ImagePipeline] All ${attempts} Gemini API attempts failed. Falling back to Pollinations AI...`);
         const seed = Math.floor(Math.random() * 1000000);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}`;
-        const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(30_000) });
-        if (!response.ok) throw new Error(`Pollinations fallback failed (HTTP ${response.status})`);
-        
-        generated = { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get('content-type') || 'image/jpeg' };
-        prompt = `${prompt} Vetted Pollinations fallback after provider error: ${providerError instanceof Error ? providerError.message : String(providerError)}`;
+        try {
+          const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(30_000) });
+          if (!response.ok) throw new Error(`Pollinations fallback failed (HTTP ${response.status})`);
+          generated = { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get('content-type') || 'image/jpeg' };
+          prompt = `${prompt} Vetted Pollinations fallback after provider error: ${providerError instanceof Error ? providerError.message : String(providerError)}`;
+        } catch (pollinationsError) {
+          console.log(`[ImagePipeline] Pollinations API failed (${pollinationsError instanceof Error ? pollinationsError.message : String(pollinationsError)}). Falling back to local SVG brand image...`);
+          const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
+          generated = { buffer: svgBuffer, mimeType: 'image/jpeg' };
+          prompt = `Local brand SVG fallback used after API failures. Topic: ${input.topic}`;
+        }
       }
       const normalizedBuffer = await sharp(generated.buffer)
         .resize(1200, 630, { fit: 'cover', position: 'centre' })
