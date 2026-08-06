@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Getting Started",
+    "lessons": [
+      { "title": "Introduction to Perplexity", "slug": "perplexity-introduction" },
+      { "title": "Create an Account", "slug": "perplexity-create-account" },
+      { "title": "Interface Overview", "slug": "perplexity-interface" }
+    ]
+  },
+  {
+    "module": "Core Features",
+    "lessons": [
+      { "title": "Asking Questions", "slug": "perplexity-asking" },
+      { "title": "Copilot Mode", "slug": "perplexity-copilot" },
+      { "title": "Focus Modes", "slug": "perplexity-focus" },
+      { "title": "Collections", "slug": "perplexity-collections" },
+      { "title": "File Uploads", "slug": "perplexity-uploads" }
+    ]
+  },
+  {
+    "module": "Advanced Capabilities",
+    "lessons": [
+      { "title": "Discover Tab", "slug": "perplexity-discover" },
+      { "title": "Pro Features", "slug": "perplexity-pro" },
+      { "title": "API Integration", "slug": "perplexity-api" }
+    ]
+  },
+  {
+    "module": "Practical Applications",
+    "lessons": [
+      { "title": "Academic Research", "slug": "perplexity-research" },
+      { "title": "Best Use Cases", "slug": "perplexity-best-use-cases" },
+      { "title": "Common Mistakes", "slug": "perplexity-mistakes" },
+      { "title": "Quiz", "slug": "perplexity-quiz" }
+    ]
+  }
+]

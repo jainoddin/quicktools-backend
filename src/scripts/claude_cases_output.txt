@@ -1,0 +1,119 @@
+        { type: 'paragraph', content: "A simple, complete walkthrough of Claude — from creating an account to writing better prompts, using Projects, Artifacts, and picking the right model for the job.", id: 'p-0' },
+      ];
+
+    case 'claude-introduction-to-claude':
+      return [
+        { type: 'heading', title: "Introduction to Claude", level: 1, id: 'heading-1' },
+        { type: 'paragraph', content: "Claude is an AI assistant built by Anthropic. You can chat with it to get help writing, coding, analyzing data, summarizing documents, brainstorming ideas, and much more.", id: 'p-2' },
+        { type: 'paragraph', content: "Claude is available in a few different places:", id: 'p-3' },
+        { type: 'list', items: ["Claude.ai — the web and mobile chat app for everyday use","Claude Code — a coding assistant for developers","Claude API / Console — for building your own apps powered by Claude"], id: 'list-4' },
+        { type: 'paragraph', content: "Anthropic focuses heavily on safety, so Claude is designed to be helpful while avoiding harmful or misleading answers.", id: 'p-5' },
+      ];
+
+    case 'claude-create-an-account':
+      return [
+        { type: 'heading', title: "Create an Account", level: 1, id: 'heading-6' },
+        { type: 'paragraph', content: "Getting started takes less than a minute:", id: 'p-7' },
+        { type: 'list', items: ["Go to claude.ai","Click 'Sign up' and enter your email address (or continue with Google)","Verify your email using the code sent to you","Add your name and you're in — free plan starts automatically"], id: 'list-8' },
+        { type: 'paragraph', content: "You can upgrade to Pro, Team, or Enterprise later for higher usage limits and extra features like more Projects and priority access to new models.", id: 'p-9' },
+      ];
+
+    case 'claude-interface-overview':
+      return [
+        { type: 'heading', title: "Interface Overview", level: 1, id: 'heading-10' },
+        { type: 'paragraph', content: "Once you're logged in, the interface has a few key areas:", id: 'p-11' },
+        { type: 'list', items: ["Left sidebar — new chat, chat history, Projects, and settings","Main chat window — where you type prompts and see Claude's replies","Message box — type your question here; you can attach files too","Model selector — usually near the message box, lets you pick Haiku, Sonnet, or Opus","Artifacts panel — opens on the right when Claude creates a document, code, or app for you"], id: 'list-12' },
+        { type: 'paragraph', content: "Everything is designed to feel like a simple chat app, so you won't need training to get started.", id: 'p-13' },
+      ];
+
+    case 'claude-prompt-basics-for-claude':
+      return [
+        { type: 'heading', title: "Prompt Basics for Claude", level: 1, id: 'heading-14' },
+        { type: 'paragraph', content: "A 'prompt' is just the message you type to Claude. The better your prompt, the better the answer.", id: 'p-15' },
+        { type: 'heading', title: "Tips for good prompts", level: 2, id: 'h2-16' },
+        { type: 'list', items: ["Be specific: say exactly what you want, and for whom","Give context: share background info Claude needs to help well","Break big tasks into steps if the task is complex","Ask Claude to ask you questions first if your request is unclear","Give examples of the style or format you want"], id: 'list-17' },
+      ];
+
+    case 'claude-system-prompts':
+      return [
+        { type: 'heading', title: "System Prompts", level: 1, id: 'heading-18' },
+        { type: 'paragraph', content: "A system prompt is a set of instructions given to Claude before the conversation starts — it shapes how Claude behaves throughout the chat (tone, role, rules, constraints).", id: 'p-19' },
+        { type: 'paragraph', content: "On claude.ai, this is available through 'Custom Instructions' / 'Project instructions'. On the API/Console, developers pass a system prompt directly in code.", id: 'p-20' },
+        { type: 'list', items: ["Example: 'You are a friendly customer support agent for a shoe brand. Keep answers short and polite.'","System prompts are great for keeping Claude consistent across many conversations"], id: 'list-21' },
+      ];
+
+    case 'claude-file-uploads':
+      return [
+        { type: 'heading', title: "File Uploads", level: 1, id: 'heading-22' },
+        { type: 'paragraph', content: "You can upload files directly into a chat and ask Claude to read, summarize, or work with them.", id: 'p-23' },
+        { type: 'list', items: ["Supported types include PDF, Word (.docx), Excel (.xlsx), CSV, TXT, and images (PNG/JPG)","Click the '+' or paperclip icon near the message box to attach a file","Claude can extract text, analyze data, describe images, and combine multiple files in one answer"], id: 'list-24' },
+        { type: 'paragraph', content: "For files you'll reuse often, upload them to a Project's Knowledge base instead of re-uploading every time.", id: 'p-25' },
+      ];
+
+    case 'claude-claude-artifacts':
+      return [
+        { type: 'heading', title: "Claude Artifacts", level: 1, id: 'heading-26' },
+        { type: 'paragraph', content: "Artifacts are a special panel where Claude places substantial content — code, documents, slides, or interactive apps — separately from the chat, so you can view, edit, and reuse it easily.", id: 'p-27' },
+        { type: 'list', items: ["Great for: web pages, React components, long documents, diagrams, and data visualizations","You can ask Claude to revise an Artifact and it updates in place","Artifacts can be downloaded or copied out of Claude.ai"], id: 'list-28' },
+      ];
+
+    case 'claude-data-analysis':
+      return [
+        { type: 'heading', title: "Data Analysis", level: 1, id: 'heading-29' },
+        { type: 'paragraph', content: "Claude can analyze data files directly in chat — for example a CSV or Excel file of sales numbers.", id: 'p-30' },
+        { type: 'list', items: ["Upload your data file and ask a question in plain English, e.g. 'Which product sold best each month?'","Claude can write and run code behind the scenes to calculate answers accurately","It can also generate charts and tables to visualize trends"], id: 'list-31' },
+      ];
+
+    case 'claude-projects-in-claude':
+      return [
+        { type: 'heading', title: "Projects in Claude", level: 1, id: 'heading-32' },
+        { type: 'paragraph', content: "A Project is a persistent workspace that keeps context, instructions, and files together so you don't have to re-explain yourself every time.", id: 'p-33' },
+        { type: 'list', items: ["Create a Project from the sidebar, give it a name and description","Add 'Project knowledge' — documents Claude should always know about","Add custom instructions describing tone, role, and rules for that Project","Every new chat inside the Project automatically uses this context"], id: 'list-34' },
+        { type: 'paragraph', content: "Projects are useful for recurring work: a specific client, a course, a codebase, or an ongoing writing project.", id: 'p-35' },
+      ];
+
+    case 'claude-claude-workbench':
+      return [
+        { type: 'heading', title: "Claude Workbench", level: 1, id: 'heading-36' },
+        { type: 'paragraph', content: "The Workbench is a developer tool inside the Anthropic Console (console.anthropic.com) — separate from claude.ai — used to test prompts before building them into an app.", id: 'p-37' },
+        { type: 'list', items: ["Write a system prompt and test messages, then see Claude's live response","Adjust settings like model choice, temperature, and max tokens","Export your exact setup as ready-to-use Python, TypeScript, or cURL code"], id: 'list-38' },
+        { type: 'paragraph', content: "This is aimed at developers building products with the Claude API, not regular chat users.", id: 'p-39' },
+      ];
+
+    case 'claude-sonnet-vs-opus-vs-haiku':
+      return [
+        { type: 'heading', title: "Sonnet vs Opus vs Haiku", level: 1, id: 'heading-40' },
+        { type: 'paragraph', content: "Anthropic offers a few different Claude models, each suited to different needs:", id: 'p-41' },
+        { type: 'paragraph', content: "Simple rule of thumb: use Haiku for speed, Sonnet for daily driving, and Opus when accuracy on a hard problem matters more than speed or cost.", id: 'p-42' },
+      ];
+
+    case 'claude-coding-with-claude':
+      return [
+        { type: 'heading', title: "Coding with Claude", level: 1, id: 'heading-43' },
+        { type: 'paragraph', content: "Claude is strong at writing, explaining, and debugging code across most popular languages.", id: 'p-44' },
+        { type: 'list', items: ["Paste code and ask Claude to explain, fix bugs, or optimize it","Ask for a full feature and Claude can generate multi-file projects","Use Artifacts to preview web apps (HTML/React) directly in the chat","Developers who code often can also use Claude Code, a dedicated command-line coding agent"], id: 'list-45' },
+      ];
+
+    case 'claude-best-use-cases':
+      return [
+        { type: 'heading', title: "Best Use Cases", level: 1, id: 'heading-46' },
+        { type: 'paragraph', content: "Some of the most popular ways people use Claude:", id: 'p-47' },
+        { type: 'list', items: ["Writing: emails, blog posts, reports, resumes","Coding: building apps, debugging, learning new languages","Research: summarizing articles, comparing options, brainstorming","Data work: cleaning spreadsheets, finding trends, building charts","Learning: explaining tough concepts in simple terms"], id: 'list-48' },
+      ];
+
+    case 'claude-common-mistakes':
+      return [
+        { type: 'heading', title: "Common Mistakes", level: 1, id: 'heading-49' },
+        { type: 'paragraph', content: "Avoiding these will get you much better results:", id: 'p-50' },
+        { type: 'list', items: ["Writing one-line vague prompts and expecting a perfect answer","Not correcting Claude when the first answer isn't quite right — just ask it to revise","Starting a new chat every time instead of using a Project for repeated work","Not double-checking important facts, numbers, or citations before using them"], id: 'list-51' },
+      ];
+
+    case 'claude-quiz-test-yourself':
+      return [
+        { type: 'heading', title: "Quiz — Test Yourself", level: 1, id: 'heading-52' },
+        { type: 'paragraph', content: "Answer these to check your understanding (answers are at the end):", id: 'p-53' },
+        { type: 'list', items: ["1. What is a Project used for in Claude?","2. Which model would you pick for the fastest, simplest replies?","3. Where do Artifacts appear when Claude creates them?","4. True or False: A system prompt is set only for one single message.","5. Which tool lets developers test prompts before writing code — claude.ai or the Workbench?"], id: 'list-54' },
+        { type: 'heading', title: "Answer Key", level: 2, id: 'h2-55' },
+        { type: 'list', items: ["1. To keep context, instructions, and files together for recurring work","2. Haiku","3. In the Artifacts panel, next to the chat","4. False — it applies to the whole conversation/Project","5. The Workbench"], id: 'list-56' },
+      ];
+

@@ -1,0 +1,22 @@
+[
+  {
+    "module": "Course Content",
+    "lessons": [
+      { "title": "Introduction", "slug": "introduction" },
+      { "title": "Create an Account", "slug": "create-account" },
+      { "title": "Interface Overview", "slug": "interface-overview" },
+      { "title": "Prompt Basics", "slug": "prompt-basics" },
+      { "title": "System Prompts", "slug": "system-prompts" },
+      { "title": "File Uploads", "slug": "file-uploads" },
+      { "title": "Image Generation", "slug": "image-generation" },
+      { "title": "Data Analysis", "slug": "data-analysis" },
+      { "title": "Custom GPTs", "slug": "custom-gpts" },
+      { "title": "Projects", "slug": "projects" },
+      { "title": "Voice Mode", "slug": "voice-mode" },
+      { "title": "Coding with ChatGPT", "slug": "coding-with-chatgpt" },
+      { "title": "Best Use Cases", "slug": "best-use-cases" },
+      { "title": "Common Mistakes", "slug": "common-mistakes" },
+      { "title": "Quiz", "slug": "quiz" }
+    ]
+  }
+]

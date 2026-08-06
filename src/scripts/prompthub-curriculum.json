@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Getting Started",
+    "lessons": [
+      { "title": "What is a Prompt Hub?", "slug": "prompthub-introduction" },
+      { "title": "Interface Overview", "slug": "prompthub-interface" },
+      { "title": "Browsing Prompts", "slug": "prompthub-browsing" }
+    ]
+  },
+  {
+    "module": "Core Concepts",
+    "lessons": [
+      { "title": "Using Prompts", "slug": "prompthub-using" },
+      { "title": "Creating Your Own", "slug": "prompthub-creating" },
+      { "title": "Variables & Templates", "slug": "prompthub-variables" },
+      { "title": "System Prompts", "slug": "prompthub-system" },
+      { "title": "Context Window Management", "slug": "prompthub-context" }
+    ]
+  },
+  {
+    "module": "Advanced Prompting",
+    "lessons": [
+      { "title": "Few-Shot Prompting", "slug": "prompthub-fewshot" },
+      { "title": "Chain of Thought", "slug": "prompthub-cot" },
+      { "title": "Evaluation", "slug": "prompthub-evaluation" }
+    ]
+  },
+  {
+    "module": "Practical Applications",
+    "lessons": [
+      { "title": "Sharing Prompts", "slug": "prompthub-sharing" },
+      { "title": "Best Practices", "slug": "prompthub-best-practices" },
+      { "title": "Common Mistakes", "slug": "prompthub-mistakes" },
+      { "title": "Quiz", "slug": "prompthub-quiz" }
+    ]
+  }
+]

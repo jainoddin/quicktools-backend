@@ -16,6 +16,7 @@ import contactRoutes from './routes/contact.routes';
 import adminRoutes from './routes/admin.routes';
 import communityRoutes from './routes/community.routes';
 import uploadRoutes from './routes/upload.routes';
+import learnRoutes from './routes/learn.route';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import helmet from 'helmet';
@@ -96,6 +97,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/learn', learnRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)
 

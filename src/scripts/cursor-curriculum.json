@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Getting Started",
+    "lessons": [
+      { "title": "Introduction to Cursor", "slug": "cursor-introduction" },
+      { "title": "Installation & Setup", "slug": "cursor-setup" },
+      { "title": "Interface Overview", "slug": "cursor-interface" }
+    ]
+  },
+  {
+    "module": "Core Features",
+    "lessons": [
+      { "title": "Code Generation (Cmd+K)", "slug": "cursor-cmd-k" },
+      { "title": "Chat & Context", "slug": "cursor-chat" },
+      { "title": "Codebase Indexing", "slug": "cursor-indexing" },
+      { "title": "Debugging", "slug": "cursor-debugging" },
+      { "title": "Refactoring", "slug": "cursor-refactoring" }
+    ]
+  },
+  {
+    "module": "Advanced Capabilities",
+    "lessons": [
+      { "title": "Terminal Usage", "slug": "cursor-terminal" },
+      { "title": "Using External Models", "slug": "cursor-models" },
+      { "title": "Custom Prompts", "slug": "cursor-custom-prompts" }
+    ]
+  },
+  {
+    "module": "Practical Applications",
+    "lessons": [
+      { "title": "Best Extensions", "slug": "cursor-extensions" },
+      { "title": "Advanced Workflows", "slug": "cursor-workflows" },
+      { "title": "Common Mistakes", "slug": "cursor-mistakes" },
+      { "title": "Quiz", "slug": "cursor-quiz" }
+    ]
+  }
+]

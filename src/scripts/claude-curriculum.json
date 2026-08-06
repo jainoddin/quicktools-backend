@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Getting Started",
+    "lessons": [
+      { "title": "Introduction to Claude", "slug": "claude-introduction" },
+      { "title": "Create an Account", "slug": "claude-create-account" },
+      { "title": "Interface Overview", "slug": "claude-interface" }
+    ]
+  },
+  {
+    "module": "Core Skills",
+    "lessons": [
+      { "title": "Prompt Basics for Claude", "slug": "claude-prompts" },
+      { "title": "System Prompts", "slug": "claude-system-prompts" },
+      { "title": "File Uploads", "slug": "claude-file-uploads" },
+      { "title": "Claude Artifacts", "slug": "claude-artifacts" },
+      { "title": "Data Analysis", "slug": "claude-data-analysis" }
+    ]
+  },
+  {
+    "module": "Advanced Features",
+    "lessons": [
+      { "title": "Projects in Claude", "slug": "claude-projects" },
+      { "title": "Claude Workbench", "slug": "claude-workbench" },
+      { "title": "Sonnet vs Opus vs Haiku", "slug": "claude-models" }
+    ]
+  },
+  {
+    "module": "Practical Applications",
+    "lessons": [
+      { "title": "Coding with Claude", "slug": "claude-coding" },
+      { "title": "Best Use Cases", "slug": "claude-best-use-cases" },
+      { "title": "Common Mistakes", "slug": "claude-mistakes" },
+      { "title": "Quiz", "slug": "claude-quiz" }
+    ]
+  }
+]

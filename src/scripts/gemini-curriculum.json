@@ -1,0 +1,37 @@
+[
+  {
+    "module": "Getting Started",
+    "lessons": [
+      { "title": "Introduction to Gemini", "slug": "gemini-introduction" },
+      { "title": "Create an Account", "slug": "gemini-create-account" },
+      { "title": "Interface Overview", "slug": "gemini-interface" }
+    ]
+  },
+  {
+    "module": "Core Features",
+    "lessons": [
+      { "title": "Prompt Basics for Gemini", "slug": "gemini-prompts" },
+      { "title": "Gemini Advanced", "slug": "gemini-advanced" },
+      { "title": "Google Workspace Integration", "slug": "gemini-workspace" },
+      { "title": "Image Generation", "slug": "gemini-image-gen" },
+      { "title": "Data Analysis", "slug": "gemini-data-analysis" }
+    ]
+  },
+  {
+    "module": "Advanced Capabilities",
+    "lessons": [
+      { "title": "Extensions", "slug": "gemini-extensions" },
+      { "title": "Custom Gems", "slug": "gemini-gems" },
+      { "title": "Gemini API", "slug": "gemini-api" }
+    ]
+  },
+  {
+    "module": "Practical Applications",
+    "lessons": [
+      { "title": "Coding with Gemini", "slug": "gemini-coding" },
+      { "title": "Best Use Cases", "slug": "gemini-best-use-cases" },
+      { "title": "Common Mistakes", "slug": "gemini-mistakes" },
+      { "title": "Quiz", "slug": "gemini-quiz" }
+    ]
+  }
+]
