@@ -14,6 +14,7 @@ import subscriberRoutes from './routes/subscriberRoutes';
 import statsRoutes from './routes/stats.routes';
 import contactRoutes from './routes/contact.routes';
 import adminRoutes from './routes/admin.routes';
+import adminSeoRoutes from './routes/adminSeo.routes';
 import communityRoutes from './routes/community.routes';
 import uploadRoutes from './routes/upload.routes';
 import learnRoutes from './routes/learn.route';
@@ -41,7 +42,9 @@ app.use(
 const allowedOrigins = new Set(
   [
     'https://quicktools.ai',
+    'https://www.quicktools.ai',   // www variant
     'https://quicktool.space',
+    'https://www.quicktool.space', // www variant
     FRONTEND_URL,
     ...(isProd ? [] : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005']),
   ].filter(Boolean)
@@ -64,6 +67,9 @@ app.use(
       return cb(new Error('Not allowed by CORS'));
     },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Set-Cookie'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   })
 );
 
@@ -95,6 +101,7 @@ app.use('/api/subscribe', subscriberRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/seo', adminSeoRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/learn', learnRoutes);
