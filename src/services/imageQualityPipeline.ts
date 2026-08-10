@@ -59,24 +59,30 @@ export function selectImageFamily(kind: ContentKind, category: string, recent: s
 
 function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
   const value = `${topic} ${category}`.toLowerCase();
-  let subject = 'a believable modern technology workspace with devices and subtle data visualization';
-  if (/(perplexity.*chatgpt|chatgpt.*perplexity|\bvs\b|versus|comparison)/.test(value)) subject = 'a balanced side-by-side AI research comparison workspace with two distinct laptop workflows, one focused on cited web research and the other on conversational assistance, without people or brand logos';
-  else if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal AI workspace where a laptop, camera image, audio waveform, document, and data panels connect into one coherent workflow';
-  else if (/claude|prompt|agent|workflow/.test(value)) subject = 'a clean professional prompt-engineering workspace with a structured prompt editor, connected workflow cards, and precise process diagrams';
-  else if (/locali[sz]|translat|language|global content/.test(value)) subject = 'a bright global communication scene with a globe, multilingual speech bubbles, and connected regional content';
-  else if (/aws|cloud|server|security|secure/.test(value)) subject = 'a realistic cloud infrastructure scene with server racks, connected cloud services, and a clear security-lock concept';
-  else if (/code|developer|software|app|program/.test(value)) subject = 'a realistic developer workspace with a laptop, code editor, architecture diagram, and testing tools';
-  else if (/business|marketing|sales|growth|seo/.test(value)) subject = 'a professional business workspace with a clean analytics dashboard, campaign planning materials, and growth charts';
-  else if (/image|design|photo|video|visual/.test(value)) subject = 'a bright creative studio with camera, editing display, color tools, and polished visual-production equipment';
-  else if (/contract|legal|document|review/.test(value)) subject = 'a professional document-review desk with contracts, highlighted clauses, approval marks, and a secure digital review interface';
-  else if (/data|extract|database|analytics/.test(value)) subject = 'a realistic data-analysis workspace showing documents flowing into organized tables, charts, and verified structured records';
+  // Prefer physical, text-free visual metaphors. Screens, documents and dashboards
+  // make lightweight image models invent gibberish text and fail the quality gate.
+  let subject = 'a believable tabletop technology scene made from connected geometric modules, subtle signal paths, and precise physical components';
+  if (/(perplexity.*chatgpt|chatgpt.*perplexity|\bvs\b|versus|comparison)/.test(value)) subject = 'a balanced side-by-side comparison made from two distinct sets of physical research tokens connected to one central decision scale';
+  else if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal arrangement where a camera lens, blank photo tile, waveform sculpture, and data blocks connect into one coherent system';
+  else if (/locali[sz]|translat|language|global content/.test(value)) subject = 'a bright global communication scene with a physical globe, blank speech symbols, and connected regional markers';
+  else if (/aws|cloud|server|security|secure/.test(value)) subject = 'a realistic miniature cloud infrastructure scene with server-shaped blocks, connected services, and a prominent unbranded security lock';
+  else if (/sql|database|data extract|analytics/.test(value)) subject = 'a realistic data pipeline made from stacked blank tiles flowing into organized grids, physical chart shapes, and verified records without labels';
+  else if (/risk|compliance|audit/.test(value)) subject = 'a professional risk assessment scene with a balance scale, shield, branching decision paths, and color-coded blank blocks';
+  else if (/contract|legal|document|review/.test(value)) subject = 'a professional legal review still life with blank paper shapes, a magnifying glass, approval tokens, shield, and organized clause markers with no writing';
+  else if (/newsletter|email|engagement/.test(value)) subject = 'an editorial communication-growth still life with a blank envelope, connected audience tokens, and rising physical chart blocks';
+  else if (/brand|identity/.test(value)) subject = 'a premium brand strategy still life with blank color swatches, geometric identity pieces, alignment grid, and connected positioning markers';
+  else if (/business model|pitch|startup|invest/.test(value)) subject = 'a premium business strategy tabletop with blank model blocks, a clear value pathway, directional arrows, and an ascending physical chart';
+  else if (/code|developer|software|app|program/.test(value)) subject = 'a realistic software architecture model made from connected code-shaped brackets, modular blocks, testing tokens, and circuit paths without screens';
+  else if (/claude|prompt|agent|workflow/.test(value)) subject = 'a clean workflow made from blank modular cards, connected nodes, branching paths, and precise physical process markers';
+  else if (/business|marketing|sales|growth|seo/.test(value)) subject = 'a professional business strategy tabletop with blank geometric charts, campaign tokens, directional arrows, and growth blocks';
+  else if (/image|design|photo|video|visual/.test(value)) subject = 'a bright creative studio still life with a camera, lens, blank color swatches, lighting tools, and polished visual-production equipment without displays';
 
   const format = kind === 'news'
     ? 'credible editorial news photography, immediate and factual'
     : kind === 'article'
       ? 'premium editorial magazine photography, analytical and polished'
       : 'approachable realistic tech editorial photography, practical and human-friendly';
-  return `BRIGHT REALISTIC EDITORIAL PHOTOGRAPHY on a white or softly lit neutral background. Show ${subject}. This is a 16:9 ${kind} cover about "${topic}" in the ${category} category. Presentation: ${format}. Style family: ${family}. Make the main objects large, recognizable, naturally arranged, and easy to understand at first glance. Use daylight, realistic materials, clean negative space, crisp detail, and only small restrained QuickTools purple/blue accents. Use a fresh composition unlike recent covers. Absolutely no dark background, black scene, neon cyberpunk lighting, robots, cyborgs, humanoid AI figures, glowing AI brains, sci-fi control rooms, official company logos, fake product screenshots, readable text, letters, watermarks, or human faces.`;
+  return `BRIGHT REALISTIC EDITORIAL PHOTOGRAPHY on a white or softly lit neutral background. Show ${subject}. Create a 16:9 ${kind} cover for the ${category} category. Presentation: ${format}. Style family: ${family}. Communicate the subject only through objects and composition; never reproduce the article title or any words. Make the main objects large, recognizable, naturally arranged, and easy to understand at first glance. Use daylight, realistic materials, clean negative space, crisp detail, and only small restrained QuickTools purple/blue accents. Use a fresh composition unlike recent covers. Every surface, card, paper, display and label must be completely blank. Absolutely no typography, text, letters, numbers, symbols resembling writing, dark background, black scene, neon cyberpunk lighting, robots, cyborgs, humanoid AI figures, glowing AI brains, sci-fi control rooms, official company logos, fake product screenshots, watermarks, or human faces.`;
 }
 
 export async function generateGeminiRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
@@ -309,6 +315,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         : prompt;
       try {
         try {
+          if (attempt === attempts) throw new Error('Rotating away from Cloudflare on the final attempt');
           generated = await withTimeout(
             generateCloudflareRealisticImage(attemptPrompt, attempt),
             125_000,
