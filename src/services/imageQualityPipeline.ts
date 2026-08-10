@@ -60,7 +60,8 @@ export function selectImageFamily(kind: ContentKind, category: string, recent: s
 function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
   const value = `${topic} ${category}`.toLowerCase();
   let subject = 'a believable modern technology workspace with devices and subtle data visualization';
-  if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal AI workspace where a laptop, camera image, audio waveform, document, and data panels connect into one coherent workflow';
+  if (/(perplexity.*chatgpt|chatgpt.*perplexity|\bvs\b|versus|comparison)/.test(value)) subject = 'a balanced side-by-side AI research comparison workspace with two distinct laptop workflows, one focused on cited web research and the other on conversational assistance, without people or brand logos';
+  else if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal AI workspace where a laptop, camera image, audio waveform, document, and data panels connect into one coherent workflow';
   else if (/claude|prompt|agent|workflow/.test(value)) subject = 'a clean professional prompt-engineering workspace with a structured prompt editor, connected workflow cards, and precise process diagrams';
   else if (/locali[sz]|translat|language|global content/.test(value)) subject = 'a bright global communication scene with a globe, multilingual speech bubbles, and connected regional content';
   else if (/aws|cloud|server|security|secure/.test(value)) subject = 'a realistic cloud infrastructure scene with server racks, connected cloud services, and a clear security-lock concept';
@@ -237,7 +238,7 @@ async function generateLocalBrandImage(topic: string, kind: ContentKind, categor
 async function visualReview(buffer: Buffer, mimeType: string, topic: string, family: string): Promise<string[]> {
   return runWithFailover(async (genAI, modelName) => {
     const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.1, maxOutputTokens: 800, responseMimeType: 'application/json' } });
-    const result = await model.generateContent([{ text: `Validate this editorial cover for topic "${topic}" and style "${family}". The central visual must make the topic recognizable at category level (for example localization needs language/globe symbolism, prompting needs a prompt/workflow interface, and cloud security needs cloud/blocks/lock symbolism). Reject a generic or unrelated visual. Also reject blur, unsafe content, visible generated text, watermark, deceptive real-company logo/screenshot, severe artifacts, or colors incompatible with the clean purple/blue QuickTools brand. Return concise JSON only: {"passed":true,"errors":[]}. Maximum 5 short errors.` }, { inlineData: { data: buffer.toString('base64'), mimeType } }]);
+    const result = await model.generateContent([{ text: `Validate this realistic editorial cover for topic "${topic}" and style "${family}". The central visual must make the topic recognizable at category level (for example a comparison needs a clear side-by-side concept, localization needs language/globe symbolism, prompting needs a prompt/workflow interface, and cloud security needs cloud/blocks/lock symbolism). Reject a generic or unrelated visual. Reject anime, cartoons, dolls, human faces, robots, cyborgs, humanoid AI characters, fantasy scenes, dark neon cyberpunk imagery, blur, unsafe content, visible generated text, watermark, deceptive real-company logo/screenshot, severe artifacts, or colors incompatible with the clean purple/blue QuickTools brand. Return concise JSON only: {"passed":true,"errors":[]}. Maximum 5 short errors.` }, { inlineData: { data: buffer.toString('base64'), mimeType } }]);
     const raw = result.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
@@ -272,8 +273,13 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     let selectedAssetKey: string | undefined;
     try {
       let generated: { buffer: Buffer; mimeType: string };
+      let generatedLocally = false;
       try {
-        generated = await generateGeminiRealisticImage(prompt, attempt);
+        generated = await withTimeout(
+          generateGeminiRealisticImage(prompt, attempt),
+          45_000,
+          'Gemini image generation',
+        );
       } catch (providerError) {
         if (attempt < attempts) {
           console.log(`[ImagePipeline] Gemini API failed on attempt ${attempt} (${providerError instanceof Error ? providerError.message : String(providerError)}). Retrying...`);
@@ -298,6 +304,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           console.log(`[ImagePipeline] Pollinations API failed (${pollinationsError instanceof Error ? pollinationsError.message : String(pollinationsError)}). Falling back to local SVG brand image...`);
           const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
           generated = { buffer: svgBuffer, mimeType: 'image/jpeg' };
+          generatedLocally = true;
           prompt = `Local brand SVG fallback used after API failures. Topic: ${input.topic}`;
         }
       }
@@ -309,9 +316,25 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
       if (normalizedBuffer.length < 25_000) errors.push('Image file is too small or low resolution');
       const dimensions = imageDimensions(normalizedBuffer);
       if (!dimensions || dimensions.width !== 1200 || dimensions.height !== 630) errors.push(`Image dimensions must be 1200x630; received ${dimensions ? `${dimensions.width}x${dimensions.height}` : 'unknown'}`);
-      // Covers are assembled from audited SVG motifs, so relevance is deterministic and
-      // does not depend on a rate-limited external vision API.
-      if (!errors.length) errors.push(...deterministicSemanticReview(input.topic, input.category));
+      if (!errors.length) {
+        errors.push(...deterministicSemanticReview(input.topic, input.category));
+      }
+      // Generated provider images must be inspected, not merely trusted because the
+      // prompt contains negative instructions. This rejects anime, faces, robots,
+      // text, and unrelated visuals before anything reaches R2 or gets published.
+      // The local SVG fallback is assembled from audited motifs and remains
+      // deterministic, so it does not require an external vision request.
+      if (!errors.length && !generatedLocally) {
+        try {
+          errors.push(...await withTimeout(
+            visualReview(normalizedBuffer, normalizedMimeType, input.topic, family),
+            90_000,
+            'Image visual review',
+          ));
+        } catch (reviewError) {
+          errors.push(`Image visual review unavailable: ${reviewError instanceof Error ? reviewError.message : String(reviewError)}`);
+        }
+      }
       if (!errors.length) {
         r2Url = await uploadToR2(normalizedBuffer, normalizedMimeType, `${input.contentId}.jpg`, input.folder);
         try {

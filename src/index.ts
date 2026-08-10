@@ -19,6 +19,7 @@ import communityRoutes from './routes/community.routes';
 import uploadRoutes from './routes/upload.routes';
 import learnRoutes from './routes/learn.route';
 import promptRoutes from './routes/prompt.routes';
+import navigatorRoutes from './routes/navigator.routes';
 import adminPromptRoutes from './routes/adminPrompt.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
@@ -109,6 +110,7 @@ app.use('/api/community', communityRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/learn', learnRoutes);
 app.use('/api/prompts', promptRoutes);
+app.use('/api/navigator', navigatorRoutes);
 app.use('/api/admin/prompts', adminPromptRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)

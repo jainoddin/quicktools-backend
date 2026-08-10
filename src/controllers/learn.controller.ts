@@ -36,8 +36,16 @@ export const getLessonBySlug = async (req: Request, res: Response) => {
     const lesson = await LearnLesson.findOne({ courseId: course._id, slug: req.params.lessonSlug, status: 'published' });
     if (!lesson) return res.status(404).json({ error: 'Lesson not found' });
 
-    const previousLesson = lesson.previousLessonId ? await LearnLesson.findById(lesson.previousLessonId).select('slug title') : null;
-    const nextLesson = lesson.nextLessonId ? await LearnLesson.findById(lesson.nextLessonId).select('slug title') : null;
+    // Older seeded lessons may not have explicit previous/next IDs. Fall back to
+    // the stable course order so navigation remains complete without mutating data.
+    const [previousLesson, nextLesson] = await Promise.all([
+      lesson.previousLessonId
+        ? LearnLesson.findById(lesson.previousLessonId).select('slug title order')
+        : LearnLesson.findOne({ courseId: course._id, status: 'published', order: { $lt: lesson.order } }).sort({ order: -1 }).select('slug title order'),
+      lesson.nextLessonId
+        ? LearnLesson.findById(lesson.nextLessonId).select('slug title order')
+        : LearnLesson.findOne({ courseId: course._id, status: 'published', order: { $gt: lesson.order } }).sort({ order: 1 }).select('slug title order'),
+    ]);
 
     res.json({ course: { _id: course._id, title: course.title, slug: course.slug, icon: course.icon }, lesson, previousLesson, nextLesson });
   } catch (err) {
