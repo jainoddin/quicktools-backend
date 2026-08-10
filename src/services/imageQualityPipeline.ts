@@ -115,6 +115,35 @@ export async function generateGeminiRealisticImage(prompt: string, attempt: numb
   throw new Error(`All free Gemini image attempts failed: ${lastError}`);
 }
 
+async function generateCloudflareRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const apiToken = String(process.env.CLOUDFLARE_AI_API_TOKEN || '').trim();
+  if (process.env.CLOUDFLARE_AI_ENABLED !== 'true') throw new Error('Cloudflare Workers AI is disabled');
+  if (!accountId || !apiToken) throw new Error('Cloudflare Workers AI credentials are missing');
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+    {
+      method: 'POST',
+      signal: AbortSignal.timeout(120_000),
+      headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
+        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
+        steps: 8,
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
+  const payload: any = await response.json();
+  const image = payload?.result?.image || payload?.image;
+  if (!image || typeof image !== 'string') {
+    const detail = payload?.errors?.[0]?.message || 'response contained no image';
+    throw new Error(`Cloudflare Workers AI ${detail}`);
+  }
+  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
+}
+
 async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: string[], recentKeys: string[]) {
   const assets = await RealisticImageAsset.find({ active: true }).lean();
   if (!assets.length) throw new Error('Realistic image library is empty');
@@ -265,6 +294,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
   let prompt = makePrompt(input.topic, input.kind, input.category, family);
   const recentAssetKeys = recentDocs.map(item => item.selectedAssetKey).filter((key): key is string => Boolean(key));
   const attempts = 1 + (input.maxRegenerations ?? 2);
+  let previousValidationErrors: string[] = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const errors: string[] = [];
@@ -274,25 +304,32 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     try {
       let generated: { buffer: Buffer; mimeType: string };
       let generatedLocally = false;
+      const attemptPrompt = previousValidationErrors.length
+        ? `${prompt}\nThe previous image was rejected for: ${previousValidationErrors.join('; ')}. Correct every issue and create a visibly different composition.`
+        : prompt;
       try {
-        generated = await withTimeout(
-          generateGeminiRealisticImage(prompt, attempt),
-          45_000,
-          'Gemini image generation',
-        );
-      } catch (providerError) {
-        if (attempt < attempts) {
-          console.log(`[ImagePipeline] Gemini API failed on attempt ${attempt} (${providerError instanceof Error ? providerError.message : String(providerError)}). Retrying...`);
-          // Wait 2 seconds before retrying to avoid immediate rate limits
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
+        try {
+          generated = await withTimeout(
+            generateCloudflareRealisticImage(attemptPrompt, attempt),
+            125_000,
+            'Cloudflare Workers AI image generation',
+          );
+          prompt = `${attemptPrompt} (Cloudflare Workers AI FLUX)`;
+        } catch (cloudflareError) {
+          console.log(`[ImagePipeline] Cloudflare Workers AI unavailable (${cloudflareError instanceof Error ? cloudflareError.message : String(cloudflareError)}). Trying Gemini...`);
+          generated = await withTimeout(
+            generateGeminiRealisticImage(attemptPrompt, attempt),
+            125_000,
+            'Gemini image generation',
+          );
+          prompt = `${attemptPrompt} (Gemini image fallback)`;
         }
-        
-        console.log(`[ImagePipeline] All ${attempts} Gemini API attempts failed. Falling back to Pollinations AI (Flux)...`);
+      } catch (providerError) {
+        console.log(`[ImagePipeline] Cloudflare and Gemini failed on attempt ${attempt}. Falling back to Pollinations AI (Flux)...`);
         const seed = Math.floor(Math.random() * 1000000);
         // Keep the fallback semantically faithful. Repeating generic cyberpunk/robot
         // terms made unrelated topics look identical and reduced editorial trust.
-        const enhancedPrompt = `${prompt} Photorealistic editorial composition, contextually accurate objects, clean natural depth, subtle cinematic finish, no generic AI mascot.`;
+        const enhancedPrompt = `${attemptPrompt} Photorealistic editorial composition, contextually accurate objects, clean natural depth, subtle cinematic finish, no generic AI mascot.`;
         const negativePrompt = 'dark background, black background, cyberpunk, neon, robot, cyborg, humanoid, android, AI brain, glowing orb, sci-fi control room, server tunnel, fantasy, logo, watermark, text, letters, face, low contrast, blurry';
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1200&height=630&nologo=true&seed=${seed}&model=flux&negative_prompt=${encodeURIComponent(negativePrompt)}`;
         try {
@@ -355,6 +392,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
       if (selectedAssetKey) await RealisticImageAsset.updateOne({ key: selectedAssetKey }, { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date() } });
       return { url: r2Url!, family };
     }
+    previousValidationErrors = errors;
   }
   return null;
 }
