@@ -401,6 +401,35 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     }
     previousValidationErrors = errors;
   }
+
+  // Free image providers are not consistently capable of following strict
+  // editorial constraints. Preserve the daily publishing guarantee by using a
+  // previously approved, topic-ranked realistic R2 asset only after every
+  // generated-image attempt has failed. Never upload an unreviewed generation.
+  try {
+    const libraryAsset = await selectRealisticLibraryAsset(input.topic, stylesAlreadyUsedToday, recentAssetKeys);
+    await withTimeout(verifyR2Object(libraryAsset.r2Url), 30_000, 'Realistic library R2 verification');
+    await ImageStyleHistory.create({
+      contentId: input.contentId,
+      contentType: input.kind,
+      category: input.category,
+      selectedFamily: libraryAsset.family,
+      selectedAssetKey: libraryAsset.key,
+      prompt: `Approved realistic-library fallback selected for topic: ${input.topic}`,
+      attemptNumber: attempts + 1,
+      validationErrors: [],
+      r2Url: libraryAsset.r2Url,
+      finalStatus: 'passed',
+    });
+    await RealisticImageAsset.updateOne(
+      { key: libraryAsset.key },
+      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date() } },
+    );
+    console.log(`[ImagePipeline] Generated images failed; using approved realistic library asset "${libraryAsset.key}".`);
+    return { url: libraryAsset.r2Url, family: libraryAsset.family };
+  } catch (libraryError) {
+    console.warn(`[ImagePipeline] Approved realistic library fallback unavailable: ${libraryError instanceof Error ? libraryError.message : String(libraryError)}`);
+  }
   return null;
 }
 
