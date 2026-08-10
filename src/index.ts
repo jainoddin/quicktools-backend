@@ -18,6 +18,8 @@ import adminSeoRoutes from './routes/adminSeo.routes';
 import communityRoutes from './routes/community.routes';
 import uploadRoutes from './routes/upload.routes';
 import learnRoutes from './routes/learn.route';
+import promptRoutes from './routes/prompt.routes';
+import adminPromptRoutes from './routes/adminPrompt.routes';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import helmet from 'helmet';
@@ -25,6 +27,7 @@ import './services/auth.service'; // Register passport strategies
 import { startCronJobs } from './cron/blogScheduler';
 import { startSocialMediaCron } from './cron/socialMediaScheduler';
 import { startReportingCron } from './cron/reportingScheduler';
+import { startPromptCron } from './cron/promptScheduler';
 import rateLimit from 'express-rate-limit';
 import { FRONTEND_URL, PORT, isProd } from './config/env';
 
@@ -105,6 +108,8 @@ app.use('/api/admin/seo', adminSeoRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/learn', learnRoutes);
+app.use('/api/prompts', promptRoutes);
+app.use('/api/admin/prompts', adminPromptRoutes);
 
 // /api/fix-blogs REMOVED — was a public destructive endpoint (security risk)
 
@@ -137,6 +142,7 @@ const start = async () => {
   startCronJobs();
   startSocialMediaCron();
   startReportingCron();
+  startPromptCron();
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Backend running on http://localhost:${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/blogs`);

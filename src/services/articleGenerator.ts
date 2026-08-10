@@ -282,8 +282,6 @@ Return STRICTLY a JSON object matching this EXACT structure (but vary the conten
         console.error("AI Article Generation Error:", error);
         try {
           if (typeof jsonString !== 'undefined') {
-            require('fs').writeFileSync('debug_json.json', jsonString);
-            console.log('Saved debug_json.json for troubleshooting.');
           }
         } catch (e) {
           console.error('Failed to save debug JSON:', e);

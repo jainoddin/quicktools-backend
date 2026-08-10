@@ -58,10 +58,27 @@ export function selectImageFamily(kind: ContentKind, category: string, recent: s
 }
 
 function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
-  return `Create a premium, high-tech, futuristic 16:9 editorial cover image for a ${kind} titled "${topic}" in the ${category} category. Visual style: ${family}. If the topic mentions specific AI tools (like Google Gemini, ChatGPT, Claude, AWS, etc.), prominently feature their official logos in the center. Surround the subject with glowing holographic screens, floating UI elements, and data nodes representing AI workflows. Use realistic materials, glowing neon lights, deep colors (purple, blue, indigo), cinematic lighting, depth, and polished technology-magazine quality. Make each image visually distinct. No text labels, no readable words, no letters, no watermark, no human faces.`;
+  const value = `${topic} ${category}`.toLowerCase();
+  let subject = 'a believable modern technology workspace with devices and subtle data visualization';
+  if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal AI workspace where a laptop, camera image, audio waveform, document, and data panels connect into one coherent workflow';
+  else if (/claude|prompt|agent|workflow/.test(value)) subject = 'a clean professional prompt-engineering workspace with a structured prompt editor, connected workflow cards, and precise process diagrams';
+  else if (/locali[sz]|translat|language|global content/.test(value)) subject = 'a bright global communication scene with a globe, multilingual speech bubbles, and connected regional content';
+  else if (/aws|cloud|server|security|secure/.test(value)) subject = 'a realistic cloud infrastructure scene with server racks, connected cloud services, and a clear security-lock concept';
+  else if (/code|developer|software|app|program/.test(value)) subject = 'a realistic developer workspace with a laptop, code editor, architecture diagram, and testing tools';
+  else if (/business|marketing|sales|growth|seo/.test(value)) subject = 'a professional business workspace with a clean analytics dashboard, campaign planning materials, and growth charts';
+  else if (/image|design|photo|video|visual/.test(value)) subject = 'a bright creative studio with camera, editing display, color tools, and polished visual-production equipment';
+  else if (/contract|legal|document|review/.test(value)) subject = 'a professional document-review desk with contracts, highlighted clauses, approval marks, and a secure digital review interface';
+  else if (/data|extract|database|analytics/.test(value)) subject = 'a realistic data-analysis workspace showing documents flowing into organized tables, charts, and verified structured records';
+
+  const format = kind === 'news'
+    ? 'credible editorial news photography, immediate and factual'
+    : kind === 'article'
+      ? 'premium editorial magazine photography, analytical and polished'
+      : 'approachable realistic tech editorial photography, practical and human-friendly';
+  return `BRIGHT REALISTIC EDITORIAL PHOTOGRAPHY on a white or softly lit neutral background. Show ${subject}. This is a 16:9 ${kind} cover about "${topic}" in the ${category} category. Presentation: ${format}. Style family: ${family}. Make the main objects large, recognizable, naturally arranged, and easy to understand at first glance. Use daylight, realistic materials, clean negative space, crisp detail, and only small restrained QuickTools purple/blue accents. Use a fresh composition unlike recent covers. Absolutely no dark background, black scene, neon cyberpunk lighting, robots, cyborgs, humanoid AI figures, glowing AI brains, sci-fi control rooms, official company logos, fake product screenshots, readable text, letters, watermarks, or human faces.`;
 }
 
-async function generateGeminiRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+export async function generateGeminiRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
   const keys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map(key => key.trim()).filter(Boolean);
   if (!keys.length) throw new Error('No Gemini API keys configured for realistic image generation');
   const models = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
@@ -265,14 +282,18 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           continue;
         }
         
-        console.log(`[ImagePipeline] All ${attempts} Gemini API attempts failed. Falling back to Pollinations AI...`);
+        console.log(`[ImagePipeline] All ${attempts} Gemini API attempts failed. Falling back to Pollinations AI (Flux)...`);
         const seed = Math.floor(Math.random() * 1000000);
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=630&nologo=true&seed=${seed}`;
+        // Keep the fallback semantically faithful. Repeating generic cyberpunk/robot
+        // terms made unrelated topics look identical and reduced editorial trust.
+        const enhancedPrompt = `${prompt} Photorealistic editorial composition, contextually accurate objects, clean natural depth, subtle cinematic finish, no generic AI mascot.`;
+        const negativePrompt = 'dark background, black background, cyberpunk, neon, robot, cyborg, humanoid, android, AI brain, glowing orb, sci-fi control room, server tunnel, fantasy, logo, watermark, text, letters, face, low contrast, blurry';
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1200&height=630&nologo=true&seed=${seed}&model=flux&negative_prompt=${encodeURIComponent(negativePrompt)}`;
         try {
-          const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(30_000) });
+          const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(60_000) });
           if (!response.ok) throw new Error(`Pollinations fallback failed (HTTP ${response.status})`);
           generated = { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get('content-type') || 'image/jpeg' };
-          prompt = `${prompt} Vetted Pollinations fallback after provider error: ${providerError instanceof Error ? providerError.message : String(providerError)}`;
+          prompt = `${prompt} (Vetted Pollinations FLUX fallback)`;
         } catch (pollinationsError) {
           console.log(`[ImagePipeline] Pollinations API failed (${pollinationsError instanceof Error ? pollinationsError.message : String(pollinationsError)}). Falling back to local SVG brand image...`);
           const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);

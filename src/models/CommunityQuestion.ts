@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 const ActorSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User' }, guestId: String }, { _id: false });
-const AuthorSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User' }, name: { type: String, required: true }, avatar: String, isGuest: { type: Boolean, default: false } }, { _id: false });
+const AuthorSchema = new Schema({ userId: { type: Schema.Types.ObjectId, ref: 'User' }, name: { type: String, required: true }, avatar: String, isGuest: { type: Boolean, default: false }, isAiAssisted: { type: Boolean, default: false } }, { _id: false });
 const ReplySchema = new Schema({
   body: { type: String, required: true, maxlength: 12000 }, author: { type: AuthorSchema, required: true }, guestSecretHash: String,
   likedBy: { type: [ActorSchema], default: [] }, status: { type: String, enum: ['visible','pending','hidden'], default: 'visible' },

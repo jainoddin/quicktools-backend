@@ -39,7 +39,7 @@ export const getLessonBySlug = async (req: Request, res: Response) => {
     const previousLesson = lesson.previousLessonId ? await LearnLesson.findById(lesson.previousLessonId).select('slug title') : null;
     const nextLesson = lesson.nextLessonId ? await LearnLesson.findById(lesson.nextLessonId).select('slug title') : null;
 
-    res.json({ lesson, previousLesson, nextLesson });
+    res.json({ course: { _id: course._id, title: course.title, slug: course.slug, icon: course.icon }, lesson, previousLesson, nextLesson });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch lesson' });
   }
@@ -51,7 +51,9 @@ export const searchLearn = async (req: Request, res: Response) => {
     if (!q || typeof q !== 'string') return res.json([]);
     
     // Very basic regex search for demo purposes (production would use Atlas Search or text indexes)
-    const regex = new RegExp(q, 'i');
+    const escapedQuery = q.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!escapedQuery) return res.json({ courses: [], lessons: [] });
+    const regex = new RegExp(escapedQuery, 'i');
     
     const courses = await LearnCourse.find({ title: regex, isPublished: true });
     const lessons = await LearnLesson.find({ 

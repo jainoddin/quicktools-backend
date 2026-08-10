@@ -25,3 +25,15 @@ export const verifyAuth = (req: Request, res: Response, next: NextFunction) => {
     res.status(401).json({ error: 'Invalid or expired token.' });
   }
 };
+
+// Adds the authenticated user when a valid cookie exists, while still allowing guests.
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
+  const token = req.cookies?.token;
+  if (!token) return next();
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    // An expired/invalid cookie behaves as a guest on public routes.
+  }
+  next();
+};

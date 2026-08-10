@@ -6,3 +6,15 @@ check_payments.js
 link_payments.js
 update_plan.js
 google-service-account.json
+
+# Local development output and temporary diagnostics
+*.log
+debug_*.json
+debug_*.ts
+test_*.js
+test_*.ts
+test_*.html
+create_test.js
+src/__tests__/
+src/*_test.ts
+coverage/

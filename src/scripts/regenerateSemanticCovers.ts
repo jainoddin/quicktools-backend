@@ -25,9 +25,15 @@ async function replaceCover(kind: 'blog' | 'article' | 'news', slug: string) {
 
 async function main() {
   await connectDB();
-  await replaceCover('blog', 'claude-ai-system-prompts-how-to-engineer-precision-workflows-in-2026');
-  await replaceCover('news', 'aws-partners-with-superblocks-for-secure-vibe-coding');
-  await replaceCover('article', 'ai-localization-tools-scaling-global-content-in-2026');
+  const [kindArg, slugArg] = process.argv.slice(2);
+  if (kindArg && slugArg) {
+    if (!['blog', 'article', 'news'].includes(kindArg)) throw new Error(`Invalid content type: ${kindArg}`);
+    await replaceCover(kindArg as 'blog' | 'article' | 'news', slugArg);
+  } else {
+    const latestBlog: any = await Blog.findOne({}).sort({ publishedAt: -1 }).select('slug');
+    if (!latestBlog) throw new Error('No published blog found');
+    await replaceCover('blog', latestBlog.slug);
+  }
   await mongoose.disconnect();
   process.exit(0);
 }
