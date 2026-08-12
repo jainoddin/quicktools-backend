@@ -18,3 +18,10 @@ create_test.js
 src/__tests__/
 src/*_test.ts
 coverage/
+
+# Generated media and local maintenance output (R2/database remain authoritative)
+generated-assets/
+generated-covers/
+src/scripts/*.png
+src/scripts/*_output.txt
+src/scripts/tmp/

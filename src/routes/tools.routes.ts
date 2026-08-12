@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import toolsData from '../data/tools.json';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -651,8 +652,26 @@ router.post('/shorten', async (req: Request, res: Response) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
 
-    const shortCode = Math.random().toString(36).substring(2, 8);
-    const newUrl = await ShortUrl.create({ originalUrl: url, shortCode });
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return res.status(400).json({ success: false, message: 'Enter a valid URL' });
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ success: false, message: 'Only HTTP and HTTPS URLs are supported' });
+    }
+
+    let shortCode = '';
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = crypto.randomBytes(6).toString('base64url').slice(0, 8);
+      if (!(await ShortUrl.exists({ shortCode: candidate }))) {
+        shortCode = candidate;
+        break;
+      }
+    }
+    if (!shortCode) throw new Error('Unable to allocate a unique short code');
+    await ShortUrl.create({ originalUrl: parsed.toString(), shortCode });
 
     const shortLink = `/s/${shortCode}`;
     const usageId = await saveFreeToolUsage(req, '/tools/url-shortener', 'URL Shortener', url, shortLink);

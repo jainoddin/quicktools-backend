@@ -5,6 +5,7 @@ import { Article } from '../models/Article';
 import { getDailyGA4Metrics } from '../services/analyticsService';
 import { appendDailyReportRow } from '../services/sheetsService';
 import dotenv from 'dotenv';
+import { runScheduledJob } from '../utils/scheduledJob';
 dotenv.config();
 
 export function startReportingCron() {
@@ -21,6 +22,7 @@ export function startReportingCron() {
     }
 
     try {
+      await runScheduledJob('daily_reporting', async () => {
       // Get IST Date bounds for today
       const now = new Date();
       const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -46,6 +48,9 @@ export function startReportingCron() {
         activeUsers: totalUsers,
         pageViews: totalViews,
         topPage
+      });
+
+      return { date: dateStr, blogsGenerated, newsGenerated, articlesGenerated, activeUsers: totalUsers, pageViews: totalViews };
       });
 
     } catch (error) {

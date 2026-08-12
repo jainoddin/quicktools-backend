@@ -6,7 +6,7 @@ export interface IPayment extends Document {
   razorpaySignature?: string;
   amount: number;         // in paise (₹1 = 100 paise)
   currency: string;
-  status: 'created' | 'paid' | 'failed';
+  status: 'created' | 'paid' | 'failed' | 'cancelled';
   plan: string;
   userId?: string;
   email?: string;
@@ -17,11 +17,11 @@ export interface IPayment extends Document {
 const PaymentSchema = new Schema<IPayment>(
   {
     razorpayOrderId:   { type: String, required: true, unique: true },
-    razorpayPaymentId: { type: String },
+    razorpayPaymentId: { type: String, unique: true, sparse: true },
     razorpaySignature: { type: String },
     amount:            { type: Number, required: true },   // paise lo store cheyyi
     currency:          { type: String, default: 'INR' },
-    status:            { type: String, enum: ['created', 'paid', 'failed'], default: 'created' },
+    status:            { type: String, enum: ['created', 'paid', 'failed', 'cancelled'], default: 'created' },
     plan:              { type: String, default: 'pro' },
     userId:            { type: String },
     email:             { type: String },

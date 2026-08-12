@@ -2,6 +2,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
 import { JWT_SECRET } from '../config/env';
+import { CronRun } from '../models/CronRun';
+import { PromptGenerationRun } from '../models/PromptGenerationRun';
+import { CronFailure } from '../models/CronFailure';
 
 const router = express.Router();
 
@@ -35,6 +38,27 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
     return;
   }
 };
+
+// Protected operational summary. It intentionally excludes secrets and raw user data.
+router.get('/cron-health', isAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [scheduledRuns, promptRuns, unresolvedFailures] = await Promise.all([
+      CronRun.find({}).sort({ startedAt: -1 }).limit(25).lean(),
+      PromptGenerationRun.find({}).sort({ startedAt: -1 }).limit(10).lean(),
+      CronFailure.find({ resolved: { $ne: true } }).sort({ createdAt: -1 }).limit(20).lean(),
+    ]);
+    res.json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      scheduledRuns,
+      promptRuns,
+      unresolvedFailures,
+    });
+  } catch (error) {
+    console.error('[Admin] Failed to load cron health:', error);
+    res.status(500).json({ success: false, message: 'Unable to load cron health' });
+  }
+});
 
 // GET /api/admin/users
 // Fetch all users and calculate statistics

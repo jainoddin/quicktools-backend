@@ -30,7 +30,9 @@ import { startSocialMediaCron } from './cron/socialMediaScheduler';
 import { startReportingCron } from './cron/reportingScheduler';
 import { startPromptCron } from './cron/promptScheduler';
 import rateLimit from 'express-rate-limit';
-import { FRONTEND_URL, PORT, isProd } from './config/env';
+import { FRONTEND_URL, PORT, isProd, validateRuntimeEnvironment } from './config/env';
+
+validateRuntimeEnvironment();
 
 const app = express();
 
@@ -88,6 +90,32 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
+
+// Cookie-authenticated mutations must originate from a trusted browser origin.
+// Requests without Origin remain allowed for trusted server-to-server clients.
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const fetchSite = req.get('sec-fetch-site');
+  if (fetchSite === 'cross-site') {
+    return res.status(403).json({ error: 'Cross-site mutation rejected' });
+  }
+  const origin = req.get('origin');
+  const referer = req.get('referer');
+  const browserOrigin = origin || (() => {
+    if (!referer) return undefined;
+    try {
+      return new URL(referer).origin;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  // CLI/webhook/server clients normally send neither Origin nor Referer.
+  if (!browserOrigin) return next();
+  const localDevelopmentOrigin = !isProd && /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.)/.test(browserOrigin);
+  if (allowedOrigins.has(browserOrigin) || localDevelopmentOrigin) return next();
+  return res.status(403).json({ error: 'Untrusted request origin' });
+});
 
 // ─── Routes ──────────────────────────────────────────────
 app.get('/', (req, res) => {

@@ -145,24 +145,23 @@ export const generatePrompt = async (req: Request, res: Response) => {
   }
 };
 
+import { PROMPT_COLLECTIONS } from '../config/promptCollections';
+
 export const getStats = async (req: Request, res: Response) => {
   try {
-    const publishedPrompts = await Prompt.countDocuments({ status: 'published' });
-    
-    // Quick approximations based on distinct values to avoid heavy aggregation on large collections
-    const categories = (await Prompt.distinct('category', { status: 'published' })).length;
-    
-    // Using simple model distinct count as well
-    const modelNames = await Prompt.distinct('models', { status: 'published' });
-    const modelCounts = await Promise.all(modelNames.map(async model => ({ name: model, count: await Prompt.countDocuments({ status: 'published', models: model }) })));
-    const categoryNames = await Prompt.distinct('category', { status: 'published' });
-    const categoryCounts = await Promise.all(categoryNames.map(async category => ({ name: category, count: await Prompt.countDocuments({ status: 'published', category }) })));
-    
-    // Assuming collections might be added later, currently returning 0 or a placeholder
-    // If there is a PromptCollection model, we'd query it. 
-    // We'll return 12 to match the user's explicit example structure or query if Collection model exists.
-    // For now, hardcoding 12 as per the user's example if Collection doesn't exist, but wait, it's better to return a real value if possible. Since we don't have a Collection model yet, let's return 0.
-    const collections = 0; // TODO: Connect to PromptCollection model when created
+    const [stats] = await Prompt.aggregate([
+      { $match: { status: 'published' } },
+      { $facet: {
+        total: [{ $count: 'count' }],
+        categories: [{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+        models: [{ $unwind: '$models' }, { $group: { _id: '$models', count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
+      } },
+    ]);
+    const publishedPrompts = stats?.total?.[0]?.count || 0;
+    const categoryCounts = (stats?.categories || []).map((item: any) => ({ name: item._id, count: item.count }));
+    const modelCounts = (stats?.models || []).map((item: any) => ({ name: item._id, count: item.count }));
+    const categories = categoryCounts.length;
+    const collections = PROMPT_COLLECTIONS.length;
 
     res.json({
       success: true,
@@ -170,7 +169,7 @@ export const getStats = async (req: Request, res: Response) => {
         prompts: publishedPrompts,
         publishedPrompts,
         categories,
-        models: modelNames.length,
+        models: modelCounts.length,
         modelCounts,
         categoryCounts,
         collections
