@@ -146,6 +146,11 @@ EXTERNAL LINKS:
 Suggest 3–8 authoritative external links. Use ONLY official sites like openai.com, anthropic.com, ai.google, microsoft.com, github.com, huggingface.co.
 Include as a separate JSON field called "externalLinks".
 
+STRICT EDITORIAL RULES:
+- Do not invent hallucinated metrics (e.g., "600 queries/day").
+- Do not use absolute marketing claims like "completely unbiased", "virtually eliminates hallucination", or "superior pick".
+- Do not invent exact pricing unless explicitly verified. 
+
 STRICT JSON RULES:
 - Return ONLY a valid JSON object.
 - CRUCIAL: You MUST escape all double quotes inside the string values properly (e.g. use \\" instead of raw double quotes).

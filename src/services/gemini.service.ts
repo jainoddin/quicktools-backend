@@ -122,6 +122,11 @@ ${realToolsContext}
 - CRUCIAL YEAR RULE: You MUST use the year "${currentYear}" anywhere a year is mentioned (especially in titles, descriptions, and content). STRICTLY avoid using past years like 2024 or 2025.
 - Every blog MUST have a completely different structure. Never repeat introductions. Never repeat heading order. Never repeat conclusion style. Avoid AI writing patterns.
 
+STRICT EDITORIAL RULES:
+- Do not invent hallucinated metrics (e.g., "600 queries/day").
+- Do not use absolute marketing claims like "completely unbiased", "virtually eliminates hallucination", or "superior pick".
+- Do not invent exact pricing unless explicitly verified.
+
 Return ONLY valid JSON (no markdown wrapping, no backticks, no comments). Escape all strings properly. Use this EXACT structure:
 {
   "title": "Catchy SEO optimized title including the keyword",

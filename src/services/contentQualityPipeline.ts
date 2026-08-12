@@ -125,8 +125,8 @@ async function runReviewAgent(role: 'fact' | 'seo' | 'readability', kind: Conten
     : String(content.content || '');
   const roleRules = {
     fact: kind === 'news'
-      ? 'Reject every claim not supported by the supplied RSS source context, including invented reactions, quotations, figures, or implications.'
-      : 'Reject invented first-hand experience, quotations, statistics, benchmarks, surveys, named standards, case-study results, current claims, or fabricated references. General qualitative explanations, clearly framed recommendations, QuickTools platform mentions, and valid internal tool links may pass without source context; links alone are not factual claims.',
+      ? 'Reject every claim not supported by the supplied RSS source context, including invented reactions, quotations, figures, exact prices, or implications. Reject hyperbolic marketing claims like "virtually eliminates hallucination" or "superior pick".'
+      : 'Reject invented first-hand experience, quotations, statistics, benchmarks, exact pricing, surveys, named standards, case-study results, current claims, or fabricated references. Strictly reject absolute marketing claims (e.g., "100%", "unlimited", "best", "completely unbiased", "eliminates hallucinations"). General qualitative explanations, clearly framed recommendations, QuickTool platform mentions, and valid internal tool links may pass without source context; links alone are not factual claims.',
     seo: 'Check search intent alignment, title quality, non-duplication, natural keywords, useful structure, and non-spammy writing. Structured internal-link recommendations are expected; only flag promotional density when the prose body repeatedly advertises them.',
     readability: 'Check clarity, grammar, repetition, templated AI phrases, useful examples, and reader value.',
   }[role];

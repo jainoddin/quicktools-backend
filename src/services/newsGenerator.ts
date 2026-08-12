@@ -152,6 +152,9 @@ We have fetched a real news snippet. Produce a short sourced summary without add
 
 STRICT RULES:
 - DO NOT invent facts. If information is unavailable, say so.
+- Do not invent hallucinated metrics (e.g., "600 queries/day").
+- Do not use absolute marketing claims like "completely unbiased", "virtually eliminates hallucination", or "superior pick".
+- Do not invent exact pricing unless explicitly verified in the text.
 - Summarize the provided news article ONLY.
 - Total length across summary, whatHappened, whyItMatters, highlights, insight, and conclusion: TARGET 285-320 words; hard range 250-350. Count before returning JSON. Neutral, journalistic tone. No fluff.
 - Clearly attribute the original source, but do not put editorial notes, AI disclosures, or review-process text inside the article body; the page UI displays that disclosure separately.
