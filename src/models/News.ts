@@ -40,7 +40,7 @@ const NewsSchema = new Schema<INews>(
     summary: { type: String, required: true },
     heroImage: { type: String, required: true },
     author: {
-      name: { type: String, default: 'QuickTools AI' },
+      name: { type: String, default: 'QuickTool Team' },
       avatar: { type: String, default: '/icon.svg' },
     },
     publishedAt: { type: Date, default: Date.now },

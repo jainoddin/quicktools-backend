@@ -38,7 +38,7 @@ const BlogSchema = new Schema<IBlog>(
     tags: [{ type: String }],
     coverImage: { type: String, required: true },
     author: {
-      name: { type: String, default: 'QuickTools AI' },
+      name: { type: String, default: 'QuickTool Team' },
       avatar: { type: String, default: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/quicktools-bot.png' },
     },
     readTime: { type: String, required: true },

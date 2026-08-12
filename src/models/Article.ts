@@ -59,8 +59,8 @@ const ArticleSchema = new Schema<IArticle>(
     tags: [{ type: String }],
     coverImage: { type: String, required: true },
     author: {
-      name: { type: String, default: 'QuickTools AI Team' },
-      avatar: { type: String, default: 'https://ui-avatars.com/api/?name=QuickTools+AI&background=6D5EF8&color=fff' },
+      name: { type: String, default: 'QuickTool Team' },
+      avatar: { type: String, default: 'https://ui-avatars.com/api/?name=QuickTool+Team&background=6D5EF8&color=fff' },
       isVerified: { type: Boolean, default: true },
       bio: { type: String, default: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.' },
     },
