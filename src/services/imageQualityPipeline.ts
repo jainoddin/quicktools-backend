@@ -255,11 +255,39 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           console.log(`[ImagePipeline] Pexels full topic search returned ${pexelsRes.status}. Continuing to fallback.`);
         }
         
+async function generateCloudflareRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const apiToken = String(process.env.CLOUDFLARE_AI_API_TOKEN || '').trim();
+  if (process.env.CLOUDFLARE_AI_ENABLED !== 'true') throw new Error('Cloudflare Workers AI is disabled');
+  if (!accountId || !apiToken) throw new Error('Cloudflare Workers AI credentials are missing');
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+    {
+      method: 'POST',
+      signal: AbortSignal.timeout(120_000),
+      headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
+        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
+        steps: 8,
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
+  const payload: any = await response.json();
+  const image = payload?.result?.image || payload?.image;
+  if (!image || typeof image !== 'string') {
+    const detail = payload?.errors?.[0]?.message || 'response contained no image';
+    throw new Error(`Cloudflare Workers AI ${detail}`);
+  }
+  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
+}
+
         let imageUrl;
         if (!response.photos || response.photos.length === 0) {
           console.log(`[ImagePipeline] No Pexels photos found for full topic. Trying extracted keywords...`);
           
-          // Fallback to top keywords from the topic if full topic yields 0 results
           const fallbackKeywords = input.topic.split(/[:|]/)[0].trim().replace(/[^a-zA-Z0-9 ]/g, '') + ' technology';
           console.log(`[ImagePipeline] Fallback Pexels search: "${fallbackKeywords}"`);
           
@@ -288,11 +316,20 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
            mimeType: 'image/jpeg'
         };
       } catch (pexelsError) {
-        console.log(`[ImagePipeline] Pexels API failed (${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}). Falling back to local SVG brand image...`);
-        const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
-        generated = { buffer: svgBuffer, mimeType: 'image/webp' };
-        generatedLocally = true;
-        prompt = `Local brand SVG fallback used after Pexels failure. Topic: ${input.topic}`;
+        console.log(`[ImagePipeline] Pexels API failed (${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}). Falling back to Cloudflare Flux AI...`);
+        try {
+          // Dynamic prompt for Cloudflare based on the blog title
+          const cfPrompt = `A cinematic, highly professional corporate technology workspace related to: ${input.topic}. Ensure it looks like a real premium editorial photograph. No glowing neon, no fake text, no robots, no human faces. Just clean physical workspace items, tablets, notebooks, and aesthetic lighting.`;
+          generated = await generateCloudflareRealisticImage(cfPrompt, attempt);
+          generatedLocally = true;
+          prompt = `Cloudflare Flux AI fallback used after Pexels failure. Topic: ${input.topic}`;
+        } catch (cfError) {
+          console.log(`[ImagePipeline] Cloudflare Flux AI failed (${cfError instanceof Error ? cfError.message : String(cfError)}). Falling back to local SVG brand image...`);
+          const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
+          generated = { buffer: svgBuffer, mimeType: 'image/webp' };
+          generatedLocally = true;
+          prompt = `Local brand SVG fallback used after Pexels & Cloudflare failure. Topic: ${input.topic}`;
+        }
       }
       const normalizedBuffer = await sharp(generated.buffer)
         .resize(1200, 630, { fit: 'cover', position: 'centre' })
