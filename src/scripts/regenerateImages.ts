@@ -22,14 +22,18 @@ async function regenerateImages() {
     cutoffDate.setDate(cutoffDate.getDate() - 1);
     cutoffDate.setHours(0, 0, 0, 0);
 
+    const { deleteFromR2 } = await import('../services/r2.service');
+
     // Find Blogs
     const blogs = await Blog.find({ createdAt: { $gte: cutoffDate } });
     console.log(`Found ${blogs.length} blogs to update...`);
     for (const blog of blogs) {
       console.log(`Regenerating image for Blog: ${blog.title}`);
+      const oldImage = blog.coverImage;
       const success = await attachValidatedImage('blog', blog);
       if (success) {
         await blog.save();
+        if (oldImage && oldImage !== blog.coverImage) await deleteFromR2(oldImage).catch(console.error);
         console.log(`✅ Updated Blog: ${blog.title}`);
       } else {
         console.log(`❌ Failed to update Blog: ${blog.title}`);
@@ -42,9 +46,11 @@ async function regenerateImages() {
     console.log(`Found ${newsItems.length} news items to update...`);
     for (const news of newsItems) {
       console.log(`Regenerating image for News: ${news.title}`);
+      const oldImage = news.heroImage;
       const success = await attachValidatedImage('news', news);
       if (success) {
         await news.save();
+        if (oldImage && oldImage !== news.heroImage) await deleteFromR2(oldImage).catch(console.error);
         console.log(`✅ Updated News: ${news.title}`);
       } else {
         console.log(`❌ Failed to update News: ${news.title}`);
@@ -57,9 +63,11 @@ async function regenerateImages() {
     console.log(`Found ${articles.length} articles to update...`);
     for (const article of articles) {
       console.log(`Regenerating image for Article: ${article.title}`);
+      const oldImage = article.coverImage;
       const success = await attachValidatedImage('article', article);
       if (success) {
         await article.save();
+        if (oldImage && oldImage !== article.coverImage) await deleteFromR2(oldImage).catch(console.error);
         console.log(`✅ Updated Article: ${article.title}`);
       } else {
         console.log(`❌ Failed to update Article: ${article.title}`);

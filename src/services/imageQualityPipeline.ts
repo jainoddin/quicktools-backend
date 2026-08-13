@@ -81,98 +81,7 @@ function makePexelsQuery(topic: string, kind: ContentKind, category: string): st
   return `${keywords} technology`;
 }
 
-function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
-  const value = `${topic} ${category}`.toLowerCase();
-  // Prefer physical, text-free visual metaphors. Screens, documents and dashboards
-  // make lightweight image models invent gibberish text and fail the quality gate.
-  let subject = 'a believable tabletop technology scene made from connected geometric modules, subtle signal paths, and precise physical components';
-  if (/(perplexity.*chatgpt|chatgpt.*perplexity|\bvs\b|versus|comparison)/.test(value)) subject = 'a balanced side-by-side comparison made from two distinct sets of physical research tokens connected to one central decision scale';
-  else if (/gemini|multimodal|vision|audio/.test(value)) subject = 'a realistic multimodal arrangement where a camera lens, blank photo tile, waveform sculpture, and data blocks connect into one coherent system';
-  else if (/locali[sz]|translat|language|global content/.test(value)) subject = 'a bright global communication scene with a physical globe, blank speech symbols, and connected regional markers';
-  else if (/aws|cloud|server|security|secure/.test(value)) subject = 'a realistic miniature cloud infrastructure scene with server-shaped blocks, connected services, and a prominent unbranded security lock';
-  else if (/sql|database|data extract|analytics/.test(value)) subject = 'a realistic data pipeline made from stacked blank tiles flowing into organized grids, physical chart shapes, and verified records without labels';
-  else if (/risk|compliance|audit/.test(value)) subject = 'a professional risk assessment scene with a balance scale, shield, branching decision paths, and color-coded blank blocks';
-  else if (/contract|legal|document|review/.test(value)) subject = 'a professional legal review still life with blank paper shapes, a magnifying glass, approval tokens, shield, and organized clause markers with no writing';
-  else if (/newsletter|email|engagement/.test(value)) subject = 'an editorial communication-growth still life with a blank envelope, connected audience tokens, and rising physical chart blocks';
-  else if (/brand|identity/.test(value)) subject = 'a premium brand strategy still life with blank color swatches, geometric identity pieces, alignment grid, and connected positioning markers';
-  else if (/business model|pitch|startup|invest/.test(value)) subject = 'a premium business strategy tabletop with blank model blocks, a clear value pathway, directional arrows, and an ascending physical chart';
-  else if (/code|developer|software|app|program/.test(value)) subject = 'a realistic software architecture model made from connected code-shaped brackets, modular blocks, testing tokens, and circuit paths without screens';
-  else if (/claude|prompt|agent|workflow/.test(value)) subject = 'a clean workflow made from blank modular cards, connected nodes, branching paths, and precise physical process markers';
-  else if (/business|marketing|sales|growth|seo/.test(value)) subject = 'a professional business strategy tabletop with blank geometric charts, campaign tokens, directional arrows, and growth blocks';
-  else if (/image|design|photo|video|visual/.test(value)) subject = 'a bright creative studio still life with a camera, lens, blank color swatches, lighting tools, and polished visual-production equipment without displays';
 
-  const format = kind === 'news'
-    ? 'credible editorial news photography, immediate and factual'
-    : kind === 'article'
-      ? 'premium editorial magazine photography, analytical and polished'
-      : 'approachable realistic tech editorial photography, practical and human-friendly';
-  return `BRIGHT REALISTIC EDITORIAL PHOTOGRAPHY on a white or softly lit neutral background. Show ${subject}. Create a 16:9 ${kind} cover for the ${category} category. Presentation: ${format}. Style family: ${family}. Communicate the subject only through objects and composition; never reproduce the article title or any words. Make the main objects large, recognizable, naturally arranged, and easy to understand at first glance. Use daylight, realistic materials, clean negative space, crisp detail, and only small restrained QuickTools purple/blue accents. Use a fresh composition unlike recent covers. Every surface, card, paper, display and label must be completely blank. Absolutely no typography, text, letters, numbers, symbols resembling writing, dark background, black scene, neon cyberpunk lighting, robots, cyborgs, humanoid AI figures, glowing AI brains, sci-fi control rooms, official company logos, fake product screenshots, watermarks, or human faces.`;
-}
-
-export async function generateGeminiRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
-  const keys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map(key => key.trim()).filter(Boolean);
-  if (!keys.length) throw new Error('No Gemini API keys configured for realistic image generation');
-  const models = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
-  let lastError = 'Image generation failed';
-  for (const model of models) {
-    for (const key of keys) {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: 'POST', signal: AbortSignal.timeout(120_000),
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${prompt}\nVariation seed: ${attempt}. Return one image only.` }] }],
-            generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '16:9' } },
-          }),
-        });
-        if (!response.ok) {
-          lastError = `${model} returned HTTP ${response.status}`;
-          if ([400, 401, 403, 404, 429, 503].includes(response.status)) continue;
-          throw new Error(lastError);
-        }
-        const payload: any = await response.json();
-        const parts = payload?.candidates?.flatMap((candidate: any) => candidate?.content?.parts || []) || [];
-        const image = parts.find((part: any) => part.inlineData?.data || part.inline_data?.data);
-        const data = image?.inlineData?.data || image?.inline_data?.data;
-        const mimeType = image?.inlineData?.mimeType || image?.inline_data?.mime_type || 'image/png';
-        if (!data) throw new Error(`${model} returned no image data`);
-        return { buffer: Buffer.from(data, 'base64'), mimeType };
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-      }
-    }
-  }
-  throw new Error(`All free Gemini image attempts failed: ${lastError}`);
-}
-
-async function generateCloudflareRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
-  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
-  const apiToken = String(process.env.CLOUDFLARE_AI_API_TOKEN || '').trim();
-  if (process.env.CLOUDFLARE_AI_ENABLED !== 'true') throw new Error('Cloudflare Workers AI is disabled');
-  if (!accountId || !apiToken) throw new Error('Cloudflare Workers AI credentials are missing');
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
-    {
-      method: 'POST',
-      signal: AbortSignal.timeout(120_000),
-      headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
-        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
-        steps: 8,
-      }),
-    },
-  );
-  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
-  const payload: any = await response.json();
-  const image = payload?.result?.image || payload?.image;
-  if (!image || typeof image !== 'string') {
-    const detail = payload?.errors?.[0]?.message || 'response contained no image';
-    throw new Error(`Cloudflare Workers AI ${detail}`);
-  }
-  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
-}
 
 async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: string[], recentKeys: string[]) {
   const assets = await RealisticImageAsset.find({ active: true }).lean();
@@ -339,8 +248,12 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         
         const pexelsSearchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(attemptPrompt)}&per_page=5&orientation=landscape`;
         const pexelsRes = await fetch(pexelsSearchUrl, { headers: { Authorization: 'zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d' } });
-        if (!pexelsRes.ok) throw new Error(`Pexels Search API returned ${pexelsRes.status}`);
-        const response: any = await pexelsRes.json();
+        let response: any = { photos: [] };
+        if (pexelsRes.ok) {
+          response = await pexelsRes.json();
+        } else {
+          console.log(`[ImagePipeline] Pexels full topic search returned ${pexelsRes.status}. Continuing to fallback.`);
+        }
         
         let imageUrl;
         if (!response.photos || response.photos.length === 0) {

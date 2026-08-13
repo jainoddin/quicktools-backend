@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { generateImageBuffer, uploadToR2, verifyR2Object } from './r2.service';
-import { generateGeminiRealisticImage } from './imageQualityPipeline';
+
 import { RealisticImageAsset } from '../models/RealisticImageAsset';
 import crypto from 'crypto';
 
@@ -44,10 +44,9 @@ export async function generatePromptCover(title: string, category: string, prefe
   let generated: { buffer: Buffer; mimeType: string };
   if (!preferGenerated) generated = await composeUniqueLibraryCover(title, category);
   else try {
-    generated = await generateGeminiRealisticImage(prompt, Math.floor(Math.random() * 1_000_000));
+    generated = await generateImageBuffer(prompt);
   } catch {
-    try { generated = await generateImageBuffer(prompt); }
-    catch { generated = await composeUniqueLibraryCover(title, category); }
+    generated = await composeUniqueLibraryCover(title, category);
   }
   const normalized = await sharp(generated.buffer).resize(1200, 630, { fit: 'cover', position: 'centre' }).webp({ quality: 85, effort: 6 }).toBuffer();
   const url = await uploadToR2(normalized, 'image/webp', `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)}.webp`, 'prompt_covers');
