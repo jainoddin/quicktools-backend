@@ -1,3 +1,5 @@
+import { createClient } from 'pexels';
+const pexelsClient = createClient('zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d');
 import { ImageStyleHistory } from '../models/ImageStyleHistory';
 import { deleteFromR2, uploadToR2, verifyR2Object } from './r2.service';
 import { runWithFailover } from './geminiClient';
@@ -55,6 +57,28 @@ export function selectImageFamily(kind: ContentKind, category: string, recent: s
   const last = recent[0];
   const counts = new Map(candidates.map(family => [family, recent.filter(item => item === family).length]));
   return candidates.filter(family => family !== last).sort((a, b) => (counts.get(a) || 0) - (counts.get(b) || 0))[0] || candidates[0];
+}
+
+function makePexelsQuery(topic: string, kind: ContentKind, category: string): string {
+  const value = `${topic} ${category}`.toLowerCase();
+  
+  if (/(perplexity.*chatgpt|chatgpt.*perplexity|\bvs\b|versus|comparison)/.test(value)) return 'technology discussion';
+  if (/gemini|multimodal|vision|audio/.test(value)) return 'artificial intelligence technology';
+  if (/locali[sz]|translat|language|global content/.test(value)) return 'global business network';
+  if (/aws|cloud|server|security|secure/.test(value)) return 'cloud computing server room';
+  if (/sql|database|data extract|analytics/.test(value)) return 'business data analytics chart';
+  if (/risk|compliance|audit/.test(value)) return 'corporate legal compliance documents';
+  if (/contract|legal|document|review/.test(value)) return 'signing business contract';
+  if (/newsletter|email|engagement/.test(value)) return 'digital marketing email tablet';
+  if (/brand|identity/.test(value)) return 'creative design agency';
+  if (/business model|pitch|startup|invest/.test(value)) return 'startup business pitch meeting';
+  if (/code|developer|software|app|program/.test(value)) return 'software developer programming code';
+  if (/claude|prompt|agent|workflow/.test(value)) return 'automated technology workflow';
+  if (/business|marketing|sales|growth|seo/.test(value)) return 'business marketing growth';
+  if (/image|design|photo|video|visual/.test(value)) return 'professional photography camera';
+  
+  const keywords = topic.split(' ').slice(0, 3).join(' ').replace(/[^a-zA-Z0-9 ]/g, '');
+  return `${keywords} technology`;
 }
 
 function makePrompt(topic: string, kind: ContentKind, category: string, family: ImageFamily): string {
@@ -290,7 +314,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     .filter(item => item.contentType !== input.kind)
     .map(item => item.selectedFamily))];
   let family = selectImageFamily(input.kind, input.category, recentDocs.map(item => item.selectedFamily), stylesAlreadyUsedToday);
-  let prompt = makePrompt(input.topic, input.kind, input.category, family);
+  let prompt = makePexelsQuery(input.topic, input.kind, input.category);
   const recentAssetKeys = recentDocs.map(item => item.selectedAssetKey).filter((key): key is string => Boolean(key));
   const attempts = 1 + (input.maxRegenerations ?? 2);
   let previousValidationErrors: string[] = [];
@@ -307,43 +331,55 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         ? `${prompt}\nThe previous image was rejected for: ${previousValidationErrors.join('; ')}. Correct every issue and create a visibly different composition.`
         : prompt;
       try {
-        try {
-          if (attempt === attempts) throw new Error('Rotating away from Cloudflare on the final attempt');
-          generated = await withTimeout(
-            generateCloudflareRealisticImage(attemptPrompt, attempt),
-            125_000,
-            'Cloudflare Workers AI image generation',
-          );
-          prompt = `${attemptPrompt} (Cloudflare Workers AI FLUX)`;
-        } catch (cloudflareError) {
-          console.log(`[ImagePipeline] Cloudflare Workers AI unavailable (${cloudflareError instanceof Error ? cloudflareError.message : String(cloudflareError)}). Trying Gemini...`);
-          generated = await withTimeout(
-            generateGeminiRealisticImage(attemptPrompt, attempt),
-            125_000,
-            'Gemini image generation',
-          );
-          prompt = `${attemptPrompt} (Gemini image fallback)`;
+        const attemptPrompt = input.topic; // Use FULL topic as requested by user
+        console.log(`[ImagePipeline] Searching Pexels for full topic: "${attemptPrompt}"`);
+        
+        // Add a small delay to prevent Pexels 401 Rate Limit for free tier
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const pexelsSearchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(attemptPrompt)}&per_page=5&orientation=landscape`;
+        const pexelsRes = await fetch(pexelsSearchUrl, { headers: { Authorization: 'zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d' } });
+        if (!pexelsRes.ok) throw new Error(`Pexels Search API returned ${pexelsRes.status}`);
+        const response: any = await pexelsRes.json();
+        
+        let imageUrl;
+        if (!response.photos || response.photos.length === 0) {
+          console.log(`[ImagePipeline] No Pexels photos found for full topic. Trying extracted keywords...`);
+          
+          // Fallback to top keywords from the topic if full topic yields 0 results
+          const fallbackKeywords = input.topic.split(/[:|]/)[0].trim().replace(/[^a-zA-Z0-9 ]/g, '') + ' technology';
+          console.log(`[ImagePipeline] Fallback Pexels search: "${fallbackKeywords}"`);
+          
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const fallbackRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeywords)}&per_page=5&orientation=landscape`, { headers: { Authorization: 'zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d' } });
+          const fallbackResponse: any = await fallbackRes.json();
+          
+          if (fallbackResponse.photos && fallbackResponse.photos.length > 0) {
+             const photo = fallbackResponse.photos[0];
+             imageUrl = photo.src.large2x || photo.src.landscape || photo.src.original;
+          } else {
+             throw new Error('Pexels returned no photos for fallback query');
+          }
+        } else {
+          const randomIndex = Math.floor(Math.random() * Math.min(response.photos.length, 3));
+          const photo = response.photos[randomIndex];
+          imageUrl = photo.src.large2x || photo.src.landscape || photo.src.original;
         }
-      } catch (providerError) {
-        console.log(`[ImagePipeline] Cloudflare and Gemini failed on attempt ${attempt}. Falling back to Pollinations AI (Flux)...`);
-        const seed = Math.floor(Math.random() * 1000000);
-        // Keep the fallback semantically faithful. Repeating generic cyberpunk/robot
-        // terms made unrelated topics look identical and reduced editorial trust.
-        const enhancedPrompt = `${attemptPrompt} Photorealistic editorial composition, contextually accurate objects, clean natural depth, subtle cinematic finish, no generic AI mascot.`;
-        const negativePrompt = 'dark background, black background, cyberpunk, neon, robot, cyborg, humanoid, android, AI brain, glowing orb, sci-fi control room, server tunnel, fantasy, logo, watermark, text, letters, face, low contrast, blurry';
-        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1200&height=630&nologo=true&seed=${seed}&model=flux&negative_prompt=${encodeURIComponent(negativePrompt)}`;
-        try {
-          const response = await fetch(pollinationsUrl, { signal: AbortSignal.timeout(60_000) });
-          if (!response.ok) throw new Error(`Pollinations fallback failed (HTTP ${response.status})`);
-          generated = { buffer: Buffer.from(await response.arrayBuffer()), mimeType: response.headers.get('content-type') || 'image/jpeg' };
-          prompt = `${prompt} (Vetted Pollinations FLUX fallback)`;
-        } catch (pollinationsError) {
-          console.log(`[ImagePipeline] Pollinations API failed (${pollinationsError instanceof Error ? pollinationsError.message : String(pollinationsError)}). Falling back to local SVG brand image...`);
-          const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
-          generated = { buffer: svgBuffer, mimeType: 'image/webp' };
-          generatedLocally = true;
-          prompt = `Local brand SVG fallback used after API failures. Topic: ${input.topic}`;
-        }
+
+        console.log(`[ImagePipeline] Downloading Pexels photo from: ${imageUrl}`);
+        const imgRes = await fetch(imageUrl);
+        if (!imgRes.ok) throw new Error(`Failed to download Pexels photo: ${imgRes.status}`);
+        
+        generated = {
+           buffer: Buffer.from(await imgRes.arrayBuffer()),
+           mimeType: 'image/jpeg'
+        };
+      } catch (pexelsError) {
+        console.log(`[ImagePipeline] Pexels API failed (${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}). Falling back to local SVG brand image...`);
+        const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
+        generated = { buffer: svgBuffer, mimeType: 'image/webp' };
+        generatedLocally = true;
+        prompt = `Local brand SVG fallback used after Pexels failure. Topic: ${input.topic}`;
       }
       const normalizedBuffer = await sharp(generated.buffer)
         .resize(1200, 630, { fit: 'cover', position: 'centre' })
