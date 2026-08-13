@@ -1,5 +1,4 @@
-import { createClient } from 'pexels';
-const pexelsClient = createClient('zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d');
+
 import { ImageStyleHistory } from '../models/ImageStyleHistory';
 import { deleteFromR2, uploadToR2, verifyR2Object } from './r2.service';
 import { runWithFailover } from './geminiClient';
