@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, HeadObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import sharp from 'sharp';
 
 dotenv.config();
 
@@ -100,5 +101,9 @@ export const generateAndUploadImage = async (title: string, folder: string): Pro
   const buffer = Buffer.from(arrayBuffer);
   
   const safeName = title.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 30);
-  return await uploadToR2(buffer, 'image/jpeg', `${safeName}.jpg`, folder);
+  const webpBuffer = await sharp(buffer)
+    .resize(1200, 800, { fit: 'cover', position: 'centre' })
+    .webp({ quality: 85, effort: 6 })
+    .toBuffer();
+  return await uploadToR2(webpBuffer, 'image/webp', `${safeName}.webp`, folder);
 };

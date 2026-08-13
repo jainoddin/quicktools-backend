@@ -21,11 +21,11 @@ async function composeUniqueLibraryCover(title: string, category: string): Promi
   const split = 650 + (hash % 180);
   const mirror = hash % 2 === 0;
   const accent = ['#4F46E5', '#2563EB', '#7C3AED', '#0891B2'][hash % 4];
-  const left = await sharp(mirror ? secondaryBuffer : primaryBuffer).resize(split, 630, { fit: 'cover', position: hash % 3 === 0 ? 'left' : 'centre' }).modulate({ brightness: 1.04, saturation: 0.92 + (hash % 12) / 100 }).jpeg({ quality: 90 }).toBuffer();
-  const right = await sharp(mirror ? primaryBuffer : secondaryBuffer).resize(1200 - split, 630, { fit: 'cover', position: hash % 3 === 1 ? 'right' : 'centre' }).modulate({ brightness: 1.02, saturation: 0.9 + (hash % 10) / 100 }).jpeg({ quality: 90 }).toBuffer();
+  const left = await sharp(mirror ? secondaryBuffer : primaryBuffer).resize(split, 630, { fit: 'cover', position: hash % 3 === 0 ? 'left' : 'centre' }).modulate({ brightness: 1.04, saturation: 0.92 + (hash % 12) / 100 }).webp({ quality: 90, effort: 6 }).toBuffer();
+  const right = await sharp(mirror ? primaryBuffer : secondaryBuffer).resize(1200 - split, 630, { fit: 'cover', position: hash % 3 === 1 ? 'right' : 'centre' }).modulate({ brightness: 1.02, saturation: 0.9 + (hash % 10) / 100 }).webp({ quality: 90, effort: 6 }).toBuffer();
   const overlay = Buffer.from(`<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="${accent}" stop-opacity=".03"/><stop offset=".55" stop-color="${accent}" stop-opacity=".18"/><stop offset="1" stop-color="#ffffff" stop-opacity=".04"/></linearGradient></defs><rect width="1200" height="630" fill="url(#g)"/><path d="M${split - 45} 0 L${split + 45} 630" stroke="white" stroke-opacity=".8" stroke-width="16"/><circle cx="${90 + (hash % 180)}" cy="${80 + (hash % 120)}" r="${24 + (hash % 30)}" fill="${accent}" fill-opacity=".18"/></svg>`);
-  const buffer = await sharp({ create: { width: 1200, height: 630, channels: 3, background: '#eef2ff' } }).composite([{ input: left, left: 0, top: 0 }, { input: right, left: split, top: 0 }, { input: overlay, left: 0, top: 0 }]).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-  return { buffer, mimeType: 'image/jpeg' };
+  const buffer = await sharp({ create: { width: 1200, height: 630, channels: 4, background: { r: 238, g: 242, b: 255, alpha: 1 } } }).composite([{ input: left, left: 0, top: 0 }, { input: right, left: split, top: 0 }, { input: overlay, left: 0, top: 0 }]).webp({ quality: 85, effort: 6 }).toBuffer();
+  return { buffer, mimeType: 'image/webp' };
 }
 
 function visualSubject(title: string, category: string): string {
@@ -49,8 +49,8 @@ export async function generatePromptCover(title: string, category: string, prefe
     try { generated = await generateImageBuffer(prompt); }
     catch { generated = await composeUniqueLibraryCover(title, category); }
   }
-  const normalized = await sharp(generated.buffer).resize(1200, 630, { fit: 'cover', position: 'centre' }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-  const url = await uploadToR2(normalized, 'image/jpeg', `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)}.jpg`, 'prompt_covers');
+  const normalized = await sharp(generated.buffer).resize(1200, 630, { fit: 'cover', position: 'centre' }).webp({ quality: 85, effort: 6 }).toBuffer();
+  const url = await uploadToR2(normalized, 'image/webp', `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)}.webp`, 'prompt_covers');
   await verifyR2Object(url);
   return url;
 }

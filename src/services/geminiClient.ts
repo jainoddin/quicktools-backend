@@ -41,11 +41,12 @@ export async function runWithFailover<T>(
          continue; // retry immediately with next model
       }
       
-      // Handle Rate limits, Quota, Invalid Keys, and High Demand by switching the API Key
+      // Handle Rate limits, Quota, Invalid Keys, Network Errors, and High Demand by switching the API Key
       if (
         error.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || 
         error.status === 400 || error?.message?.includes('API_KEY_INVALID') || error?.message?.includes('API key not valid') ||
-        error.status === 503 || error?.message?.includes('503') || error?.message?.includes('high demand')
+        error.status >= 500 || error?.message?.includes('50') || error?.message?.includes('high demand') ||
+        error?.message?.includes('fetch failed') || error?.message?.includes('network') || error?.message?.includes('timeout') || error.status === 503
       ) {
         console.log(`[GeminiClient] Key ${currentKeyIndex} unavailable for ${currentModelName}. Switching immediately...`);
         currentKeyIndex = (currentKeyIndex + 1) % keys.length;

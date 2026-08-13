@@ -17,8 +17,10 @@ async function regenerateImages() {
     await mongoose.connect(process.env.MONGODB_URI as string);
     console.log('Connected to MongoDB');
 
-    // Set to August 5th to catch the generic earth image from Aug 6
-    const cutoffDate = new Date('2026-08-05T00:00:00.000Z');
+    // Set to yesterday's start of day to regenerate images for today and yesterday
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 1);
+    cutoffDate.setHours(0, 0, 0, 0);
 
     // Find Blogs
     const blogs = await Blog.find({ createdAt: { $gte: cutoffDate } });

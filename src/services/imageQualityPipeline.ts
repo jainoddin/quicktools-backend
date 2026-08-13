@@ -267,7 +267,7 @@ async function generateLocalBrandImage(topic: string, kind: ContentKind, categor
       ? `${label}${titleSvg}${chipsSvg}<g transform="translate(555 100) scale(.62)">${topicVisual}</g><rect x="690" y="92" width="410" height="446" rx="44" fill="none" stroke="${familySecondary}" stroke-width="3" opacity=".32"/>`
       : `${label}${titleSvg}${chipsSvg}<g transform="translate(560 105) scale(.6)">${topicVisual}</g>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><defs><filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.18"/></filter><linearGradient id="glow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${familyAccent}"/><stop offset="1" stop-color="${familySecondary}"/></linearGradient></defs>${background}<rect x="35" y="35" width="1130" height="560" rx="48" fill="none" stroke="url(#glow)" stroke-width="3" opacity=".28"/>${circles}${layout}</svg>`;
-  return sharp(Buffer.from(svg)).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
+  return sharp(Buffer.from(svg)).webp({ quality: 90, effort: 6 }).toBuffer();
 }
 
 async function visualReview(buffer: Buffer, mimeType: string, topic: string, family: string): Promise<string[]> {
@@ -347,17 +347,17 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         } catch (pollinationsError) {
           console.log(`[ImagePipeline] Pollinations API failed (${pollinationsError instanceof Error ? pollinationsError.message : String(pollinationsError)}). Falling back to local SVG brand image...`);
           const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
-          generated = { buffer: svgBuffer, mimeType: 'image/jpeg' };
+          generated = { buffer: svgBuffer, mimeType: 'image/webp' };
           generatedLocally = true;
           prompt = `Local brand SVG fallback used after API failures. Topic: ${input.topic}`;
         }
       }
       const normalizedBuffer = await sharp(generated.buffer)
         .resize(1200, 630, { fit: 'cover', position: 'centre' })
-        .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
+        .webp({ quality: 85, effort: 6 })
         .toBuffer();
-      const normalizedMimeType = 'image/jpeg';
-      if (normalizedBuffer.length < 25_000) errors.push('Image file is too small or low resolution');
+      const normalizedMimeType = 'image/webp';
+      if (normalizedBuffer.length < 15_000) errors.push('Image file is too small or low resolution');
       const dimensions = imageDimensions(normalizedBuffer);
       if (!dimensions || dimensions.width !== 1200 || dimensions.height !== 630) errors.push(`Image dimensions must be 1200x630; received ${dimensions ? `${dimensions.width}x${dimensions.height}` : 'unknown'}`);
       if (!errors.length) {
@@ -380,7 +380,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         }
       }
       if (!errors.length) {
-        r2Url = await uploadToR2(normalizedBuffer, normalizedMimeType, `${input.contentId}.jpg`, input.folder);
+        r2Url = await uploadToR2(normalizedBuffer, normalizedMimeType, `${input.contentId}.webp`, input.folder);
         try {
           await withTimeout(verifyR2Object(r2Url), 30_000, 'R2 verification');
         } catch (error) {
