@@ -83,6 +83,35 @@ function makePexelsQuery(topic: string, kind: ContentKind, category: string): st
 
 
 
+async function generateCloudflareRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const apiToken = String(process.env.CLOUDFLARE_AI_API_TOKEN || '').trim();
+  if (process.env.CLOUDFLARE_AI_ENABLED !== 'true') throw new Error('Cloudflare Workers AI is disabled');
+  if (!accountId || !apiToken) throw new Error('Cloudflare Workers AI credentials are missing');
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+    {
+      method: 'POST',
+      signal: AbortSignal.timeout(120_000),
+      headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
+        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
+        steps: 8,
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
+  const payload: any = await response.json();
+  const image = payload?.result?.image || payload?.image;
+  if (!image || typeof image !== 'string') {
+    const detail = payload?.errors?.[0]?.message || 'response contained no image';
+    throw new Error(`Cloudflare Workers AI ${detail}`);
+  }
+  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
+}
+
 async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: string[], recentKeys: string[]) {
   const assets = await RealisticImageAsset.find({ active: true }).lean();
   if (!assets.length) throw new Error('Realistic image library is empty');
@@ -255,34 +284,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           console.log(`[ImagePipeline] Pexels full topic search returned ${pexelsRes.status}. Continuing to fallback.`);
         }
         
-async function generateCloudflareRealisticImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
-  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
-  const apiToken = String(process.env.CLOUDFLARE_AI_API_TOKEN || '').trim();
-  if (process.env.CLOUDFLARE_AI_ENABLED !== 'true') throw new Error('Cloudflare Workers AI is disabled');
-  if (!accountId || !apiToken) throw new Error('Cloudflare Workers AI credentials are missing');
 
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
-    {
-      method: 'POST',
-      signal: AbortSignal.timeout(120_000),
-      headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
-        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
-        steps: 8,
-      }),
-    },
-  );
-  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
-  const payload: any = await response.json();
-  const image = payload?.result?.image || payload?.image;
-  if (!image || typeof image !== 'string') {
-    const detail = payload?.errors?.[0]?.message || 'response contained no image';
-    throw new Error(`Cloudflare Workers AI ${detail}`);
-  }
-  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
-}
 
         let imageUrl;
         if (!response.photos || response.photos.length === 0) {
