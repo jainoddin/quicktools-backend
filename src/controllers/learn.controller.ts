@@ -5,6 +5,7 @@ import { LearnProgress } from '../models/LearnProgress';
 import { LearnBookmark } from '../models/LearnBookmark';
 import { LearnQuiz } from '../models/LearnQuiz';
 import { LearnQuizAttempt } from '../models/LearnQuizAttempt';
+import { Prompt } from '../models/Prompt';
 
 // Public endpoints
 export const getCourses = async (req: Request, res: Response) => {
@@ -47,7 +48,29 @@ export const getLessonBySlug = async (req: Request, res: Response) => {
         : LearnLesson.findOne({ courseId: course._id, status: 'published', order: { $gt: lesson.order } }).sort({ order: 1 }).select('slug title order'),
     ]);
 
-    res.json({ course: { _id: course._id, title: course.title, slug: course.slug, icon: course.icon }, lesson, previousLesson, nextLesson });
+    const searchTerms = [course.title, lesson.title, ...(lesson.tags || [])]
+      .join(' ')
+      .split(/[^a-z0-9]+/i)
+      .filter((term) => term.length >= 4)
+      .slice(0, 8);
+    const relatedPromptQuery = lesson.relatedPromptIds?.length
+      ? { _id: { $in: lesson.relatedPromptIds }, status: 'published' }
+      : {
+          status: 'published',
+          $or: searchTerms.length
+            ? searchTerms.flatMap((term) => [
+                { title: { $regex: term, $options: 'i' } },
+                { tags: { $regex: term, $options: 'i' } },
+              ])
+            : [{ category: 'Productivity' }],
+        };
+    const relatedPrompts = await Prompt.find(relatedPromptQuery)
+      .sort({ qualityScore: -1, publishedAt: -1 })
+      .limit(4)
+      .select('title slug description category models')
+      .lean();
+
+    res.json({ course: { _id: course._id, title: course.title, slug: course.slug, icon: course.icon }, lesson, previousLesson, nextLesson, relatedPrompts });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch lesson' });
   }

@@ -898,6 +898,7 @@ export function getBlocksForLesson(slug: string, title: string) {
     default:
       const toolSlug = slug.split('-')[0];
       const toolName = toolSlug.charAt(0).toUpperCase() + toolSlug.slice(1);
+      const lessonFocus = title.replace(new RegExp(`^${toolName}\\s*`, 'i'), '').trim() || title;
       
       let blocks: any[] = [];
       blocks.push({ type: 'heading', title: title, level: 1, id: 'fallback-heading' });
@@ -940,11 +941,23 @@ export function getBlocksForLesson(slug: string, title: string) {
         });
       }
       else {
-        blocks.push({ type: 'paragraph', content: `This lesson covers advanced concepts related to ${title}. By mastering this, you will unlock the full potential of ${toolName} and streamline your workflow.`, id: 'p1' });
+        blocks.push({ type: 'paragraph', content: `${title} is a practical part of a reliable ${toolName} workflow. This lesson focuses on when to use ${lessonFocus.toLowerCase()}, what information to prepare, and how to evaluate the result before relying on it.`, id: 'p1' });
         blocks.push({ type: 'image', url: 'https://pub-0a928134dcdc420da2af02e6238ef06b.r2.dev/chatgpt-voicemode-mockup.png', alt: title, caption: `${title} visual overview`, id: 'img1' });
-        blocks.push({ type: 'heading', title: 'Key Takeaways', level: 2, id: 'h2' });
-        blocks.push({ type: 'list', items: ['Practice makes perfect', 'Experiment with different settings', 'Stay updated with new releases', 'Combine techniques for best results'], id: 'l1' });
-        blocks.push({ type: 'callout', variant: 'warning', title: 'Remember', content: 'AI is a tool to assist you, not to completely replace human judgment. Always verify important outputs.', id: 'c1' });
+        blocks.push({ type: 'heading', title: `Apply ${lessonFocus} step by step`, level: 2, id: 'h2' });
+        blocks.push({ type: 'list', items: [
+          `Define the exact outcome you need from ${toolName} before starting.`,
+          `Provide only the context and constraints that matter to ${lessonFocus.toLowerCase()}.`,
+          'Review the first result for missing assumptions, unclear claims, and formatting problems.',
+          'Revise one variable at a time so you can identify what improved the output.'
+        ], id: 'l1' });
+        blocks.push({ type: 'heading', title: 'Quality checklist', level: 2, id: 'quality-heading' });
+        blocks.push({ type: 'list', items: [
+          'The result answers the stated task rather than a broader generic question.',
+          'Important facts, links, calculations, and recommendations are independently verified.',
+          'Sensitive or confidential information has not been added unnecessarily.',
+          'The final output is edited for the intended audience and real-world context.'
+        ], id: 'quality-list' });
+        blocks.push({ type: 'callout', variant: 'warning', title: 'Verify before use', content: `${toolName} can accelerate the workflow, but its output may be incomplete or incorrect. Check important details against trustworthy sources and apply your own judgment.`, id: 'c1' });
       }
       
       return blocks;

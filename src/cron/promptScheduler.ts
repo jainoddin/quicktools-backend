@@ -10,7 +10,9 @@ const CATEGORIES = ['Business', 'Marketing', 'Coding', 'SEO', 'Writing', 'Career
 const MAX_ATTEMPTS = 15;
 const TARGET_DRAFTS = 2; // Initial run as per user request
 const QUALITY_THRESHOLD = 90; // Stricter threshold for auto-publish
-const SEMANTIC_SIMILARITY_THRESHOLD = 0.90;
+// Lower than the old 0.90 exact-word threshold so paraphrased versions of the
+// same search intent are rejected before another indexable page is published.
+const SEMANTIC_SIMILARITY_THRESHOLD = 0.78;
 
 function normalizeText(text: string): string {
   return text.toLowerCase().replace(/[^\w\s]/gi, '').replace(/\s+/g, ' ').trim();

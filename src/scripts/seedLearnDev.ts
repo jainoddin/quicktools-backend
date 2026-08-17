@@ -61,6 +61,10 @@ const COURSES = [
   }
 ];
 
+function lessonExcerpt(courseTitle: string, moduleName: string, lessonTitle: string): string {
+  return `${lessonTitle}: a practical ${courseTitle} lesson covering the ${moduleName.toLowerCase()} workflow, key decisions, and checks you can apply.`;
+}
+
 async function seed() {
   try {
     console.log('Connecting to MongoDB...');
@@ -113,7 +117,7 @@ async function seed() {
             module: moduleName,
             difficulty: 'Beginner',
             estimatedReadMinutes: 5,
-            excerpt: `Learn about ${lessonData.title} in this comprehensive lesson.`,
+            excerpt: lessonExcerpt(courseDef.title, moduleName, lessonData.title),
             contentBlocks: blocks,
             status: 'published',
             publishedAt: new Date()

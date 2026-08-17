@@ -43,13 +43,6 @@ function generateSemanticFingerprint(title: string, description: string): string
   return crypto.createHash('sha256').update(significant.join(' ')).digest('hex');
 }
 
-function jaccardSimilarity(fingerprintA: string, fingerprintB: string): number {
-  // If we are using hashes for fingerprints, they must match exactly.
-  // However, since we want a similarity score threshold (0.90), we'll do a basic word overlap check
-  // on the normalized title + description, bypassing the hash for similarity computation.
-  return 0; // Handled in checkSemanticDuplicate
-}
-
 function computeWordSimilarity(text1: string, text2: string): number {
   const set1 = new Set(normalizeText(text1).split(' ').filter(w => w.length > 2));
   const set2 = new Set(normalizeText(text2).split(' ').filter(w => w.length > 2));
@@ -57,6 +50,48 @@ function computeWordSimilarity(text1: string, text2: string): number {
   const intersection = new Set([...set1].filter(x => set2.has(x)));
   const union = new Set([...set1, ...set2]);
   return intersection.size / union.size;
+}
+
+const INTENT_STOP_WORDS = new Set([
+  'about', 'after', 'before', 'best', 'complete', 'create', 'creating', 'from',
+  'generate', 'generator', 'guide', 'into', 'prompt', 'prompts', 'the', 'this',
+  'through', 'tool', 'tools', 'ultimate', 'using', 'with', 'your', '2025', '2026',
+]);
+
+function intentTokens(text: string): Set<string> {
+  return new Set(
+    normalizeText(text)
+      .split(' ')
+      .filter(word => word.length > 2 && !INTENT_STOP_WORDS.has(word))
+  );
+}
+
+function intentOverlap(text1: string, text2: string): number {
+  const first = intentTokens(text1);
+  const second = intentTokens(text2);
+  if (!first.size || !second.size) return 0;
+  const shared = [...first].filter(word => second.has(word)).length;
+  return shared / Math.min(first.size, second.size);
+}
+
+export function isLikelyDuplicateIntent(
+  title: string,
+  description: string,
+  existingTitle: string,
+  existingDescription: string,
+  threshold = 0.78
+): boolean {
+  const targetText = `${title} ${description}`;
+  const existingText = `${existingTitle} ${existingDescription}`;
+  const broadSimilarity = computeWordSimilarity(targetText, existingText);
+  const titleSimilarity = computeWordSimilarity(title, existingTitle);
+  const targetIntent = intentTokens(title);
+  const existingIntent = intentTokens(existingTitle);
+  const overlap = intentOverlap(title, existingTitle);
+  const sharedIntentTerms = [...targetIntent].filter(word => existingIntent.has(word)).length;
+
+  return broadSimilarity >= threshold || titleSimilarity >= threshold ||
+    (sharedIntentTerms >= 3 && overlap >= 0.72);
 }
 
 export async function checkDuplicate(title: string, slug: string): Promise<boolean> {
@@ -70,17 +105,13 @@ export async function checkDuplicate(title: string, slug: string): Promise<boole
   return !!existing;
 }
 
-export async function checkSemanticDuplicate(title: string, description: string, threshold = 0.90): Promise<boolean> {
+export async function checkSemanticDuplicate(title: string, description: string, threshold = 0.78): Promise<boolean> {
   // Pull recent or relevant prompts to check against (to avoid scanning entire DB, maybe limit to same category)
   // For safety, we can check the last 1000 prompts
   const recentPrompts = await Prompt.find({}, 'title description').sort({ createdAt: -1 }).limit(1000);
   
-  const targetText = `${title} ${description}`;
-  
   for (const p of recentPrompts) {
-    const existingText = `${p.title} ${p.description}`;
-    const similarity = computeWordSimilarity(targetText, existingText);
-    if (similarity >= threshold) {
+    if (isLikelyDuplicateIntent(title, description, p.title, p.description, threshold)) {
       return true; // Too similar!
     }
   }

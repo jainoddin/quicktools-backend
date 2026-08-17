@@ -49,10 +49,23 @@ export const getPrompts = async (req: Request, res: Response) => {
 
 export const getPromptBySlug = async (req: Request, res: Response) => {
   try {
-    const prompt = await Prompt.findOne({ slug: req.params.slug, status: 'published' });
+    const prompt: any = await Prompt.findOne({ slug: req.params.slug, status: 'published' }).lean();
     if (!prompt) return res.status(404).json({ success: false, message: 'Prompt not found' });
-    
-    res.json({ success: true, data: prompt });
+
+    const relatedPrompts = await Prompt.find({
+      _id: { $ne: prompt._id },
+      status: 'published',
+      $or: [
+        { category: prompt.category },
+        { tags: { $in: Array.isArray(prompt.tags) ? prompt.tags.slice(0, 6) : [] } },
+      ],
+    })
+      .sort({ qualityScore: -1, publishedAt: -1, createdAt: -1 })
+      .limit(4)
+      .select('title slug description category models tags')
+      .lean();
+
+    res.json({ success: true, data: { ...prompt, relatedPrompts } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
