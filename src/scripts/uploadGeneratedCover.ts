@@ -26,7 +26,8 @@ async function main() {
     .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
     .toBuffer();
   const folder = kind === 'blog' ? 'blog_covers' : kind === 'article' ? 'article_covers' : 'news_covers';
-  const url = await uploadToR2(cover, 'image/jpeg', `${slug}-editorial.jpg`, folder);
+  const replacementVersion = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+  const url = await uploadToR2(cover, 'image/jpeg', `${slug}-editorial-${replacementVersion}.jpg`, folder);
   await verifyR2Object(url);
 
   if (kind === 'news') document.heroImage = url;

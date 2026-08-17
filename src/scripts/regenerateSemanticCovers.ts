@@ -10,8 +10,11 @@ async function replaceCover(kind: 'blog' | 'article' | 'news', slug: string) {
   const Model: any = kind === 'blog' ? Blog : kind === 'article' ? Article : News;
   const document: any = await Model.findOne({ slug });
   if (!document) throw new Error(`${kind} not found: ${slug}`);
+  // A unique object key prevents browsers/CDNs from serving the previous cover
+  // after a successful image-only replacement.
+  const replacementVersion = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
   const result = await generateImageWithQualityGate({
-    contentId: `${slug}-semantic-v2`, kind,
+    contentId: `${slug}-semantic-${replacementVersion}`, kind,
     category: String(document.category || ''), topic: String(document.title),
     folder: kind === 'blog' ? 'blog_covers' : kind === 'article' ? 'article_covers' : 'news_covers',
   });
@@ -20,7 +23,7 @@ async function replaceCover(kind: 'blog' | 'article' | 'news', slug: string) {
   else document.coverImage = result.url;
   document.imageStyleFamily = result.family;
   await document.save();
-  console.log(`Updated ${kind}: ${slug}`);
+  console.log(`Updated ${kind}: ${slug} -> ${result.url}`);
 }
 
 async function main() {

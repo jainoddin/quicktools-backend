@@ -121,6 +121,9 @@ async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: str
       - (forbiddenFamilies.includes(asset.family) ? 4 : 0)
       - (recentKeys.includes(asset.key) ? 2 : 0),
   })).sort((a, b) => b.score - a.score || a.asset.usageCount - b.asset.usageCount || Number(a.asset.lastUsedAt || 0) - Number(b.asset.lastUsedAt || 0));
+  if (!ranked[0] || ranked[0].score <= 0) {
+    throw new Error('Realistic image library has no topic-relevant approved asset');
+  }
   return ranked[0].asset;
 }
 
@@ -232,8 +235,55 @@ async function generateLocalBrandImage(topic: string, kind: ContentKind, categor
 }
 
 async function visualReview(buffer: Buffer, mimeType: string, topic: string, family: string): Promise<string[]> {
-  // Temporarily bypass strict visual review to allow Pollinations images through
-  return [];
+  const result = await runWithFailover(async (genAI, modelName) => {
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const response = await model.generateContent([
+      {
+        text: `Review this editorial cover image for QuickTools.\nTopic: ${topic}\nSelected style family: ${family}\n\nReturn JSON only in this exact shape: {"relevant":true,"professional":true,"hasText":false,"hasWatermark":false,"hasFakeLogoOrUi":false,"isUnsafe":false,"isAnimeOrRobot":false,"errors":[]}\nReject it when the main visual is unrelated to the topic, low quality, blurred, contains generated text/watermarks/fake logos or fake UI, depicts anime/robots, or is unsafe. Keep error messages short.`,
+      },
+      { inlineData: { mimeType, data: buffer.toString('base64') } },
+    ]);
+    return response.response.text();
+  });
+  const jsonText = String(result).replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+  const review = JSON.parse(jsonText) as {
+    relevant?: boolean;
+    professional?: boolean;
+    hasText?: boolean;
+    hasWatermark?: boolean;
+    hasFakeLogoOrUi?: boolean;
+    isUnsafe?: boolean;
+    isAnimeOrRobot?: boolean;
+    errors?: string[];
+  };
+  const errors = Array.isArray(review.errors) ? review.errors.filter(Boolean) : [];
+  if (review.relevant !== true) errors.push('Image is not sufficiently relevant to the topic');
+  if (review.professional !== true) errors.push('Image is not editorial-quality');
+  if (review.hasText) errors.push('Image contains generated text');
+  if (review.hasWatermark) errors.push('Image contains a watermark');
+  if (review.hasFakeLogoOrUi) errors.push('Image contains a fake logo or UI');
+  if (review.isUnsafe) errors.push('Image failed safety review');
+  if (review.isAnimeOrRobot) errors.push('Image contains an anime or robot visual');
+  return [...new Set(errors)];
+}
+
+async function fetchPexelsImage(query: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+  const apiKey = String(process.env.PEXELS_API_KEY || '').trim();
+  if (!apiKey) throw new Error('PEXELS_API_KEY is missing');
+  const search = await fetch(
+    `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=8&orientation=landscape`,
+    { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(30_000) },
+  );
+  if (!search.ok) throw new Error(`Pexels search returned HTTP ${search.status}`);
+  const payload: any = await search.json();
+  const photos = Array.isArray(payload?.photos) ? payload.photos : [];
+  if (!photos.length) throw new Error(`Pexels returned no photos for "${query}"`);
+  const photo = photos[(attempt - 1) % Math.min(photos.length, 5)];
+  const imageUrl = photo?.src?.large2x || photo?.src?.landscape || photo?.src?.original;
+  if (!imageUrl) throw new Error('Pexels result contained no usable image URL');
+  const image = await fetch(imageUrl, { signal: AbortSignal.timeout(45_000) });
+  if (!image.ok) throw new Error(`Pexels image download returned HTTP ${image.status}`);
+  return { buffer: Buffer.from(await image.arrayBuffer()), mimeType: image.headers.get('content-type') || 'image/jpeg' };
 }
 
 function deterministicSemanticReview(topic: string, category: string): string[] {
@@ -263,73 +313,23 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     let selectedAssetKey: string | undefined;
     try {
       let generated: { buffer: Buffer; mimeType: string };
-      let generatedLocally = false;
       const attemptPrompt = previousValidationErrors.length
         ? `${prompt}\nThe previous image was rejected for: ${previousValidationErrors.join('; ')}. Correct every issue and create a visibly different composition.`
         : prompt;
       try {
-        const attemptPrompt = input.topic; // Use FULL topic as requested by user
-        console.log(`[ImagePipeline] Searching Pexels for full topic: "${attemptPrompt}"`);
-        
-        // Add a small delay to prevent Pexels 401 Rate Limit for free tier
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const pexelsSearchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(attemptPrompt)}&per_page=5&orientation=landscape`;
-        const pexelsRes = await fetch(pexelsSearchUrl, { headers: { Authorization: 'zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d' } });
-        let response: any = { photos: [] };
-        if (pexelsRes.ok) {
-          response = await pexelsRes.json();
-        } else {
-          console.log(`[ImagePipeline] Pexels full topic search returned ${pexelsRes.status}. Continuing to fallback.`);
-        }
-        
-
-
-        let imageUrl;
-        if (!response.photos || response.photos.length === 0) {
-          console.log(`[ImagePipeline] No Pexels photos found for full topic. Trying extracted keywords...`);
-          
-          const fallbackKeywords = input.topic.split(/[:|]/)[0].trim().replace(/[^a-zA-Z0-9 ]/g, '') + ' technology';
-          console.log(`[ImagePipeline] Fallback Pexels search: "${fallbackKeywords}"`);
-          
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          const fallbackRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(fallbackKeywords)}&per_page=5&orientation=landscape`, { headers: { Authorization: 'zWvOj98FVl4xPPWE7F0aSJkzfSlbdiVO679KGtFbJZllP8Z4DeszJj6d' } });
-          const fallbackResponse: any = await fallbackRes.json();
-          
-          if (fallbackResponse.photos && fallbackResponse.photos.length > 0) {
-             const photo = fallbackResponse.photos[0];
-             imageUrl = photo.src.large2x || photo.src.landscape || photo.src.original;
-          } else {
-             throw new Error('Pexels returned no photos for fallback query');
-          }
-        } else {
-          const randomIndex = Math.floor(Math.random() * Math.min(response.photos.length, 3));
-          const photo = response.photos[randomIndex];
-          imageUrl = photo.src.large2x || photo.src.landscape || photo.src.original;
-        }
-
-        console.log(`[ImagePipeline] Downloading Pexels photo from: ${imageUrl}`);
-        const imgRes = await fetch(imageUrl);
-        if (!imgRes.ok) throw new Error(`Failed to download Pexels photo: ${imgRes.status}`);
-        
-        generated = {
-           buffer: Buffer.from(await imgRes.arrayBuffer()),
-           mimeType: 'image/jpeg'
-        };
+        const pexelsQuery = makePexelsQuery(input.topic, input.kind, input.category);
+        console.log(`[ImagePipeline] Searching Pexels with semantic query: "${pexelsQuery}"`);
+        generated = await fetchPexelsImage(pexelsQuery, attempt);
+        prompt = `Pexels semantic query: ${pexelsQuery}. Topic: ${input.topic}`;
       } catch (pexelsError) {
         console.log(`[ImagePipeline] Pexels API failed (${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}). Falling back to Cloudflare Flux AI...`);
         try {
           // Dynamic prompt for Cloudflare based on the blog title
           const cfPrompt = `A cinematic, highly professional corporate technology workspace related to: ${input.topic}. Ensure it looks like a real premium editorial photograph. No glowing neon, no fake text, no robots, no human faces. Just clean physical workspace items, tablets, notebooks, and aesthetic lighting.`;
           generated = await generateCloudflareRealisticImage(cfPrompt, attempt);
-          generatedLocally = true;
           prompt = `Cloudflare Flux AI fallback used after Pexels failure. Topic: ${input.topic}`;
         } catch (cfError) {
-          console.log(`[ImagePipeline] Cloudflare Flux AI failed (${cfError instanceof Error ? cfError.message : String(cfError)}). Falling back to local SVG brand image...`);
-          const svgBuffer = await generateLocalBrandImage(input.topic, input.kind, input.category, family, attempt);
-          generated = { buffer: svgBuffer, mimeType: 'image/webp' };
-          generatedLocally = true;
-          prompt = `Local brand SVG fallback used after Pexels & Cloudflare failure. Topic: ${input.topic}`;
+          throw new Error(`Pexels and Cloudflare generation failed: ${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}; ${cfError instanceof Error ? cfError.message : String(cfError)}`);
         }
       }
       const normalizedBuffer = await sharp(generated.buffer)
@@ -343,9 +343,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
       // Generated provider images must be inspected, not merely trusted because the
       // prompt contains negative instructions. This rejects anime, faces, robots,
       // text, and unrelated visuals before anything reaches R2 or gets published.
-      // The local SVG fallback is assembled from audited motifs and remains
-      // deterministic, so it does not require an external vision request.
-      if (!errors.length && !generatedLocally) {
+      if (!errors.length) {
         try {
           errors.push(...await withTimeout(
             visualReview(normalizedBuffer, normalizedMimeType, input.topic, family),
@@ -354,11 +352,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           ));
         } catch (reviewError) {
           const msg = reviewError instanceof Error ? reviewError.message : String(reviewError);
-          if (msg.includes('All Gemini API keys')) {
-            console.warn(`[ImagePipeline] Skipping visual review because Gemini is unavailable: ${msg}`);
-          } else {
-            errors.push(`Image visual review unavailable: ${msg}`);
-          }
+          errors.push(`Image visual review unavailable: ${msg}`);
         }
       }
       if (errors.length > 0) {
