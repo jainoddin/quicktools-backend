@@ -35,5 +35,8 @@ export function validateRuntimeEnvironment() {
     for (const name of ['R2_ENDPOINT_URL', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL']) {
       mustGet(name);
     }
+    if (process.env.OPENAI_IMAGE_ENABLED === 'true') {
+      mustGet('OPENAI_API_KEY');
+    }
   }
 }

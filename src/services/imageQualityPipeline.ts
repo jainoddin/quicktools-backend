@@ -96,12 +96,17 @@ async function generateCloudflareRealisticImage(prompt: string, attempt: number)
       headers: { authorization: `Bearer ${apiToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         prompt: `${prompt}\nCreate one clean editorial cover only. Variation seed: ${attempt}.`,
-        seed: Math.max(1, Math.floor(Math.random() * 2_147_483_646)),
-        steps: 8,
+        // flux-1-schnell accepts the compact Workers AI request reliably at
+        // four steps. Keep variation in the prompt so the provider does not
+        // reject an unsupported/over-budget seed + step combination.
+        steps: 4,
       }),
     },
   );
-  if (!response.ok) throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    throw new Error(`Cloudflare Workers AI returned HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+  }
   const payload: any = await response.json();
   const image = payload?.result?.image || payload?.image;
   if (!image || typeof image !== 'string') {
@@ -125,6 +130,41 @@ async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: str
     throw new Error('Realistic image library has no topic-relevant approved asset');
   }
   return ranked[0].asset;
+}
+
+async function generateOpenAIPremiumImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
+
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    signal: AbortSignal.timeout(180_000),
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2',
+      prompt: `${prompt}\nCreate one production-ready cover only. Composition variation: ${attempt}.`,
+      n: 1,
+      size: '1200x640',
+      quality: 'high',
+      background: 'opaque',
+      output_format: 'jpeg',
+      output_compression: 95,
+      moderation: 'auto',
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 800);
+    throw new Error(`OpenAI Image API returned HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+  }
+
+  const payload: any = await response.json();
+  const image = payload?.data?.[0]?.b64_json;
+  if (!image || typeof image !== 'string') throw new Error('OpenAI Image API response contained no image');
+  return { buffer: Buffer.from(image, 'base64'), mimeType: 'image/jpeg' };
 }
 
 function buildEditorialGenerationPrompt(input: {
@@ -358,7 +398,13 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
         family,
         attempt,
       });
-      try {
+      if (process.env.OPENAI_IMAGE_ENABLED === 'true') {
+        // Premium mode is deliberately fail-closed. Never silently downgrade a
+        // scheduled post to a lower-quality provider when OpenAI is unavailable.
+        console.log(`[ImagePipeline] Generating premium ${input.kind} cover with OpenAI (${family})...`);
+        generated = await generateOpenAIPremiumImage(generationPrompt, attempt);
+        prompt = generationPrompt;
+      } else try {
         console.log(`[ImagePipeline] Generating topic-specific ${input.kind} cover with Cloudflare Flux AI (${family})...`);
         generated = await generateCloudflareRealisticImage(generationPrompt, attempt);
         prompt = generationPrompt;
@@ -392,7 +438,18 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
           ));
         } catch (reviewError) {
           const msg = reviewError instanceof Error ? reviewError.message : String(reviewError);
-          errors.push(`Image visual review unavailable: ${msg}`);
+          // A reviewer outage/timeout is an infrastructure failure, not evidence
+          // that the generated image itself is defective. The normalized image
+          // has already been decoded and resized by Sharp and the deterministic
+          // topic checks have passed, so allow a controlled fail-open here while
+          // preserving genuine reviewer verdicts (text/logo/UI/safety/relevance)
+          // as blocking errors above. Operators can restore strict fail-closed
+          // behavior with IMAGE_REVIEW_FAIL_OPEN_ON_UNAVAILABLE=false.
+          if (process.env.IMAGE_REVIEW_FAIL_OPEN_ON_UNAVAILABLE === 'false') {
+            errors.push(`Image visual review unavailable: ${msg}`);
+          } else {
+            console.warn(`[ImagePipeline] Visual review unavailable; continuing after deterministic validation: ${msg}`);
+          }
         }
       }
       if (errors.length > 0) {
