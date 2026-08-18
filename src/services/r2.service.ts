@@ -31,6 +31,9 @@ export const uploadToR2 = async (fileBuffer: Buffer, mimetype: string, originalN
     Key: fileName,
     Body: fileBuffer,
     ContentType: mimetype,
+    // Every upload uses a random/versioned object key, so it is safe to cache
+    // permanently at the browser and CDN edge.
+    CacheControl: 'public, max-age=31536000, immutable',
   });
 
   await r2Client.send(command);

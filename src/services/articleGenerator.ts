@@ -259,7 +259,7 @@ Return STRICTLY a JSON object matching this EXACT structure (but vary the conten
           coverImage: '',
           author: {
             name: 'QuickTools AI Team',
-            avatar: 'https://pub-68a98c57e70a4a1fa317739dd20098b9.r2.dev/1b9be0e4-c385-49a5-b0b5-ef158e8ef402.png',
+            avatar: 'https://pub-0a928134dcdc420da2af02e6238ef06b.r2.dev/brand/7d404a746424124dc6b13ea6908c7adc.webp',
             isVerified: true,
             bio: 'AI enthusiasts and researchers passionate about the future of artificial intelligence and productivity.'
           },

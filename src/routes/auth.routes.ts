@@ -173,7 +173,10 @@ router.get('/me', async (req: Request, res: Response) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
-      return res.status(401).json({ authenticated: false, message: 'No token found' });
+      // Anonymous visitors are an expected application state. Returning 200
+      // avoids a noisy browser console/network error without weakening token
+      // verification for requests that actually present a token.
+      return res.json({ authenticated: false });
     }
 
     // Verify token
