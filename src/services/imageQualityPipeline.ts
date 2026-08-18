@@ -127,6 +127,41 @@ async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: str
   return ranked[0].asset;
 }
 
+function buildEditorialGenerationPrompt(input: {
+  kind: ContentKind;
+  topic: string;
+  category: string;
+  family: ImageFamily;
+  attempt: number;
+}): string {
+  const compositionByKind: Record<ContentKind, string> = {
+    blog: 'an inviting real-world editorial scene that visually explains the practical idea, with believable objects and a clear human-centered story but no visible faces',
+    article: 'a premium analytical editorial scene with realistic physical objects, restrained data-inspired details, depth, and a polished magazine feature aesthetic',
+    news: 'a factual documentary-style editorial scene focused on the concrete event, company activity, product, place, or infrastructure described by the headline',
+  };
+  const lightingByFamily: Record<ImageFamily, string> = {
+    'Cinematic Workspace': 'cinematic natural window light in a credible modern workspace',
+    'Realistic Product Scene': 'clean commercial studio lighting around a believable physical product scene',
+    'Bright Lifestyle': 'bright natural daylight with warm, approachable editorial styling',
+    'Macro Technology': 'detailed macro photography with subtle technology materials and shallow depth of field',
+    'Tech Newsroom': 'restrained newsroom lighting and documentary realism',
+    'Editorial 3D': 'photorealistic editorial still life with subtle dimensional elements, not a cartoon render',
+    'Global Editorial': 'international editorial photography with grounded geographic or business context',
+    'Dark Studio': 'premium dark studio photography with controlled highlights and realistic materials',
+  };
+
+  return [
+    `Create a premium 1200x630 landscape cover image for a ${input.kind}.`,
+    `Headline/topic: "${input.topic}". Category: "${input.category || 'technology'}".`,
+    `Visual direction: ${compositionByKind[input.kind]}.`,
+    `Style family: ${input.family}; ${lightingByFamily[input.family]}.`,
+    'Make the subject of the headline immediately recognizable through concrete, topic-specific objects and environment. Do not substitute a generic AI control room, glowing globe, random laptop, or abstract network unless the headline specifically requires it.',
+    'Use realistic materials, natural perspective, professional editorial composition, balanced negative space, and a coherent QuickTools blue-purple accent used sparingly.',
+    'No written words, letters, numbers, title text, captions, watermarks, brand logos, fake screenshots, fake user interfaces, anime, humanoid robots, distorted people, or visible faces.',
+    `Generate a visibly distinct composition for attempt ${input.attempt}.`,
+  ].join('\n');
+}
+
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
@@ -316,20 +351,25 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
       const attemptPrompt = previousValidationErrors.length
         ? `${prompt}\nThe previous image was rejected for: ${previousValidationErrors.join('; ')}. Correct every issue and create a visibly different composition.`
         : prompt;
+      const generationPrompt = buildEditorialGenerationPrompt({
+        kind: input.kind,
+        topic: input.topic,
+        category: input.category,
+        family,
+        attempt,
+      });
       try {
+        console.log(`[ImagePipeline] Generating topic-specific ${input.kind} cover with Cloudflare Flux AI (${family})...`);
+        generated = await generateCloudflareRealisticImage(generationPrompt, attempt);
+        prompt = generationPrompt;
+      } catch (cfError) {
         const pexelsQuery = makePexelsQuery(input.topic, input.kind, input.category);
-        console.log(`[ImagePipeline] Searching Pexels with semantic query: "${pexelsQuery}"`);
-        generated = await fetchPexelsImage(pexelsQuery, attempt);
-        prompt = `Pexels semantic query: ${pexelsQuery}. Topic: ${input.topic}`;
-      } catch (pexelsError) {
-        console.log(`[ImagePipeline] Pexels API failed (${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}). Falling back to Cloudflare Flux AI...`);
+        console.warn(`[ImagePipeline] Cloudflare generation failed (${cfError instanceof Error ? cfError.message : String(cfError)}). Trying topic-relevant Pexels fallback: "${pexelsQuery}".`);
         try {
-          // Dynamic prompt for Cloudflare based on the blog title
-          const cfPrompt = `A cinematic, highly professional corporate technology workspace related to: ${input.topic}. Ensure it looks like a real premium editorial photograph. No glowing neon, no fake text, no robots, no human faces. Just clean physical workspace items, tablets, notebooks, and aesthetic lighting.`;
-          generated = await generateCloudflareRealisticImage(cfPrompt, attempt);
-          prompt = `Cloudflare Flux AI fallback used after Pexels failure. Topic: ${input.topic}`;
-        } catch (cfError) {
-          throw new Error(`Pexels and Cloudflare generation failed: ${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}; ${cfError instanceof Error ? cfError.message : String(cfError)}`);
+          generated = await fetchPexelsImage(pexelsQuery, attempt);
+          prompt = `Pexels emergency semantic fallback. Query: ${pexelsQuery}. Topic: ${input.topic}. Family: ${family}.`;
+        } catch (pexelsError) {
+          throw new Error(`Cloudflare and Pexels generation failed: ${cfError instanceof Error ? cfError.message : String(cfError)}; ${pexelsError instanceof Error ? pexelsError.message : String(pexelsError)}`);
         }
       }
       const normalizedBuffer = await sharp(generated.buffer)
@@ -381,10 +421,16 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
     previousValidationErrors = errors;
   }
 
-  // Free image providers are not consistently capable of following strict
-  // editorial constraints. Preserve the daily publishing guarantee by using a
-  // previously approved, topic-ranked realistic R2 asset only after every
-  // generated-image attempt has failed. Never upload an unreviewed generation.
+  // A broad library image can be technically valid while being unrelated to the
+  // final title. Keep this legacy escape hatch opt-in so the normal production
+  // behaviour remains fail-closed: no relevant image means no publication.
+  if (process.env.IMAGE_LIBRARY_FALLBACK_ENABLED !== 'true') {
+    console.warn('[ImagePipeline] Generated images failed; generic library fallback is disabled, so publication will be skipped.');
+    return null;
+  }
+
+  // Explicitly enabled legacy fallback. This should only be used when the
+  // operator accepts a previously approved, topic-ranked library asset.
   try {
     const libraryAsset = await selectRealisticLibraryAsset(input.topic, stylesAlreadyUsedToday, recentAssetKeys);
     await withTimeout(verifyR2Object(libraryAsset.r2Url), 30_000, 'Realistic library R2 verification');
