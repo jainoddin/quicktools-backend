@@ -154,9 +154,14 @@ ${body.slice(0, 16000)}
 Return concise JSON only: {"score":0-100,"issues":["..."],"criticalIssues":["..."]}. Maximum 5 short items per array.
 Use criticalIssues only for a reason that must block publication.`);
     const raw = response.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
-    const parsed = JSON.parse(start >= 0 && end > start ? raw.slice(start, end + 1) : raw);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseError) {
+      console.warn(`[QualityPipeline] Failed to parse JSON from ${role} reviewer. Raw output was: ${raw}`);
+      // If it fails to parse, it means the model output was malformed or truncated
+      throw new Error(`Model returned malformed JSON: ${raw.slice(0, 100)}...`);
+    }
     return {
       score: Math.max(0, Math.min(100, Number(parsed.score) || 0)),
       issues: Array.isArray(parsed.issues) ? parsed.issues.map(String) : [],
