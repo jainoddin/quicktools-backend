@@ -120,26 +120,29 @@ export async function checkSemanticDuplicate(title: string, description: string,
 
 export async function generateSinglePrompt(category: string): Promise<GeneratedPromptResult | null> {
   const promptInstruction = `
-You are an expert Prompt Engineer. Create a highly professional, ready-to-use AI prompt for the category: "${category}".
-The prompt should be highly effective, detailed, and use placeholder variables where the user can inject their own context.
+You are an expert Prompt Engineer. Create a highly professional, highly unique, and ready-to-use AI prompt for the category: "${category}".
+CRITICAL REQUIREMENTS:
+1. Ensure the prompt is highly effective, extremely detailed (minimum 150 characters), and uses placeholder variables (e.g., [variable_name]) where the user can inject their own context.
+2. The description must clearly explain the unique value of this prompt in at least 50 characters.
+3. Choose a highly specific and unique title to avoid duplicates with generic prompts.
+4. ONLY return a valid JSON object with the exact structure below, without markdown wrappers or code blocks.
 
-Return ONLY a valid JSON object with the following exact structure, no markdown wrappers, no code blocks:
 {
-  "title": "Clear, actionable title (e.g., Create a Complete Business Plan)",
+  "title": "Specific, actionable title (e.g., Create a Complete Subscription SaaS Business Plan)",
   "category": "${category}",
   "models": ["ChatGPT", "Claude", "Gemini"],
-  "prompt": "The actual detailed prompt text. Use [variable_name] for variables.",
-  "description": "Short description of what the prompt achieves.",
-  "tags": ["tag1", "tag2"],
-  "variables": ["variable_name1"],
+  "prompt": "The actual detailed prompt text. Must contain [variable_name] for variables.",
+  "description": "Clear description of the prompt's unique value.",
+  "tags": ["tag1", "tag2", "tag3"],
+  "variables": ["variable_name1", "variable_name2"],
   "difficulty": "beginner" | "intermediate" | "advanced",
-  "exampleInput": "Example variable values",
-  "exampleOutput": "Brief example of what the AI would output",
-  "usageTips": "Tips on how to use this prompt effectively",
-  "qualityScore": 95
+  "exampleInput": "Example values for the variables",
+  "exampleOutput": "Brief example of the expected AI output",
+  "usageTips": "Actionable tips to get the best results",
+  "qualityScore": 98
 }
 
-Ensure the quality score reflects your strict assessment of this prompt's utility (0-100).
+The output must be strictly parsable JSON.
 `;
 
   return await runWithFailover(async (genAI, modelName) => {

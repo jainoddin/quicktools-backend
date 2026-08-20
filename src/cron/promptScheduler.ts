@@ -7,9 +7,9 @@ import { generateSinglePrompt, checkDuplicate, checkSemanticDuplicate, reviewGen
 import { triggerPostPublishHooks } from '../services/promptPostPublish';
 
 const CATEGORIES = ['Business', 'Marketing', 'Coding', 'SEO', 'Writing', 'Career', 'Productivity', 'Social Media', 'Education'];
-const MAX_ATTEMPTS = 15;
+const MAX_ATTEMPTS = 3;
 const TARGET_DRAFTS = 2; // Initial run as per user request
-const QUALITY_THRESHOLD = 90; // Stricter threshold for auto-publish
+const QUALITY_THRESHOLD = 80; // Lowered to prevent excessive API retries
 // Lower than the old 0.90 exact-word threshold so paraphrased versions of the
 // same search intent are rejected before another indexable page is published.
 const SEMANTIC_SIMILARITY_THRESHOLD = 0.78;
