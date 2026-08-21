@@ -77,7 +77,7 @@ export function deterministicReview(kind: ContentKind, content: any, existingTit
     ? [content.summary, content.whatHappened, content.whyItMatters, content.keyHighlights?.join(' '), content.industryReaction, content.quickToolsInsight, content.conclusion].filter(Boolean).join(' ')
     : String(content.content || '');
   const count = words(body).length;
-  const [minWords, maxWords] = kind === 'news' ? [250, 350] : kind === 'blog' ? [1200, 1900] : [800, 1800];
+  const [minWords, maxWords] = kind === 'news' ? [250, 350] : kind === 'blog' ? [1100, 1900] : [800, 1800];
 
   if (!content.title || !content.slug || !body) criticalIssues.push('Missing required title, slug, or content');
   if (count < minWords || count > maxWords) criticalIssues.push(`Word count ${count} is outside ${minWords}-${maxWords}`);
