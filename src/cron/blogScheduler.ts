@@ -74,10 +74,15 @@ async function handleCronFailure(type: string, error: any) {
       </div>
     `;
 
-    const emailSent = await sendAdminNotificationEmail(subject, contentHTML);
-    if (emailSent) {
-      doc.emailed = true;
+    try {
+      const emailSent = await sendAdminNotificationEmail(subject, contentHTML);
+      if (emailSent) {
+        doc.emailed = true;
+      }
+    } catch (emailErr) {
+      console.error('[handleCronFailure] Failed to send email alert:', emailErr);
     }
+    
     await doc.save();
     console.log(`[handleCronFailure] Logged failure for ${type} on ${dateStr}. Emailed status: ${doc.emailed}`);
   } catch (err) {

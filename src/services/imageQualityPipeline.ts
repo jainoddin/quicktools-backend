@@ -481,7 +481,7 @@ export async function generateImageWithQualityGate(input: { contentId: string; k
   // A broad library image can be technically valid while being unrelated to the
   // final title. Keep this legacy escape hatch opt-in so the normal production
   // behaviour remains fail-closed: no relevant image means no publication.
-  if (process.env.IMAGE_LIBRARY_FALLBACK_ENABLED !== 'true') {
+  if (process.env.IMAGE_LIBRARY_FALLBACK_ENABLED === 'false') {
     console.warn('[ImagePipeline] Generated images failed; generic library fallback is disabled, so publication will be skipped.');
     return null;
   }
