@@ -115,8 +115,8 @@ export function startCronJobs() {
     }
   };
 
-  // 1. Blog: Runs at minute 2 of every 5-minute interval (2, 7, 12, 17, etc.) between 9 AM and 11 PM IST
-  cron.schedule('2-59/5 9-23 * * *', async () => {
+  // 1. Blog: Runs at 9:02 AM IST (with 1 retry at 9:15 AM if failed)
+  cron.schedule('2,15 9 * * *', async () => {
     if (!contentAutomationEnabled) return;
     console.log('⏰ Daily blog generation cron triggered at', new Date().toISOString());
 
@@ -171,8 +171,8 @@ export function startCronJobs() {
     timezone: 'Asia/Kolkata',
   });
 
-  // 2. Article: Runs at minute 2 of every 5-minute interval between 9 PM and 11 PM IST (Night slot)
-  cron.schedule('2-59/5 21-23 * * *', async () => {
+  // 2. Article: Runs at 9:02 PM IST (with 1 retry at 9:15 PM if failed)
+  cron.schedule('2,15 21 * * *', async () => {
     if (!contentAutomationEnabled) return;
     console.log('⏰ Night ARTICLE generation cron triggered at', new Date().toISOString());
 
@@ -226,10 +226,9 @@ export function startCronJobs() {
     timezone: 'Asia/Kolkata',
   });
 
-  // ─── NEWS AUTOMATION (3 TIMES A DAY) ───
-
-  // Afternoon News (1:02 PM IST first try, retry every 5 mins until 5:59 PM)
-  cron.schedule('2-59/5 13-17 * * *', async () => {
+  // ─── NEWS AUTOMATION ───
+  // Afternoon News: Runs at 1:02 PM IST (with 1 retry at 1:15 PM if failed)
+  cron.schedule('2,15 13 * * *', async () => {
     if (!contentAutomationEnabled) return;
     console.log('⏰ Afternoon NEWS generation cron triggered at', new Date().toISOString());
     await generateSingleNewsJob('Daily', 'news_daily', acquireLock);
@@ -270,35 +269,30 @@ export function startCronJobs() {
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  // Social Media Blast: 3 times a day with robust retry logic (Every 5 mins until success)
-  // Morning: 9:36 AM - 12:59 PM
-  cron.schedule('2-59/5 9-12 * * *', async () => {
-    const now = new Date();
-    if (now.getHours() === 9 && now.getMinutes() < 36) return; // Wait for 9:36 AM
-    console.log('⏰ Morning Social Media cron triggered at', now.toISOString());
+  // Social Media Blast: 3 times a day (1 try + 1 retry per slot)
+  // Morning: 9:36 AM and 9:50 AM
+  cron.schedule('36,50 9 * * *', async () => {
+    console.log('⏰ Morning Social Media cron triggered at', new Date().toISOString());
     await executeSocialMediaJob('Morning', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
-  // Afternoon: 2:30 PM - 5:59 PM
-  cron.schedule('2-59/5 14-17 * * *', async () => {
-    const now = new Date();
-    if (now.getHours() === 14 && now.getMinutes() < 30) return; // Wait for 2:30 PM
-    console.log('⏰ Afternoon Social Media cron triggered at', now.toISOString());
+  // Afternoon: 2:30 PM and 2:45 PM
+  cron.schedule('30,45 14 * * *', async () => {
+    console.log('⏰ Afternoon Social Media cron triggered at', new Date().toISOString());
     await executeSocialMediaJob('Afternoon', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
 
-  // Evening: 7:30 PM - 10:59 PM
-  cron.schedule('2-59/5 19-22 * * *', async () => {
-    const now = new Date();
-    if (now.getHours() === 19 && now.getMinutes() < 30) return; // Wait for 7:30 PM
-    console.log('⏰ Evening Social Media cron triggered at', now.toISOString());
+  // Evening: 7:30 PM and 7:45 PM
+  cron.schedule('30,45 19 * * *', async () => {
+    console.log('⏰ Evening Social Media cron triggered at', new Date().toISOString());
     await executeSocialMediaJob('Evening', acquireLock);
   }, { timezone: 'Asia/Kolkata' });
-  console.log('   - Blog:    Morning — 9:02 AM (retry every 5 mins till 11:59 PM)');
-  console.log('   - News:    Afternoon — 1:02 PM (retry every 5 mins till 5:59 PM)');
-  console.log('   - Article: Night — 9:02 PM (retry every 5 mins till 11:59 PM)');
+
+  console.log('   - Blog:    Morning — 9:02 AM (1 retry at 9:15 AM)');
+  console.log('   - News:    Afternoon — 1:02 PM (1 retry at 1:15 PM)');
+  console.log('   - Article: Night — 9:02 PM (1 retry at 9:15 PM)');
   console.log('   - Marketing Email: 10:00 AM daily');
-  console.log('   - Social Media Auto-Poster: 9:30 AM, 2:30 PM, 7:30 PM daily (LinkedIn, FB, Insta)');
+  console.log('   - Social Media Auto-Poster: 9:36 AM, 2:30 PM, 7:30 PM daily');
   console.log('   - Accounts: Purge deactivated (15+ days) — 3:00 AM daily');
 }
 

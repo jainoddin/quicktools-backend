@@ -2,13 +2,20 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Create reusable transporter object using SMTP transport
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true for 465, false for other ports
   auth: {
     user: process.env.EMAIL_USER || 'helloquicktool@gmail.com',
-    pass: process.env.EMAIL_PASS // User needs to set this in .env
-  }
+    pass: (process.env.EMAIL_PASS || '').replace(/['"]/g, '').trim()
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000
 });
 
 export const sendWelcomeEmail = async (toEmail: string) => {
