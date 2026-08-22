@@ -126,10 +126,10 @@ async function selectRealisticLibraryAsset(topic: string, forbiddenFamilies: str
       - (forbiddenFamilies.includes(asset.family) ? 4 : 0)
       - (recentKeys.includes(asset.key) ? 2 : 0),
   })).sort((a, b) => b.score - a.score || a.asset.usageCount - b.asset.usageCount || Number(a.asset.lastUsedAt || 0) - Number(b.asset.lastUsedAt || 0));
-  if (!ranked[0] || ranked[0].score <= 0) {
-    throw new Error('Realistic image library has no topic-relevant approved asset');
-  }
-  return ranked[0].asset;
+  
+  // If no tag specifically matched, return the least-used active asset
+  const bestAsset = ranked[0]?.score > 0 ? ranked[0].asset : assets.sort((a, b) => a.usageCount - b.usageCount)[0];
+  return bestAsset;
 }
 
 async function generateOpenAIPremiumImage(prompt: string, attempt: number): Promise<{ buffer: Buffer; mimeType: string }> {
